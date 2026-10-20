@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Chromium Browser Runner"
+description = "A browser runner for opening public web pages in server-side Chromium and viewing the page screenshot and metadata."
+version = "1.0.0"
+id = "artifacts/chromium-runner"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24927
+
+[services.development]
+run = "pnpm --filter @workspace/chromium-runner run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/chromium-runner", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/chromium-runner/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24927"
+BASE_PATH = "/"

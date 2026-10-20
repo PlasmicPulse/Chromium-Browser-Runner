@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: browser
+    description: Public web page browser operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,43 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /browser/run:
+    post:
+      operationId: runBrowser
+      tags: [browser]
+      summary: Open a public web page in Chromium
+      description: Opens a public HTTP or HTTPS page in isolated Chromium and returns a screenshot and page metadata.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BrowserRunInput"
+      responses:
+        "200":
+          description: Browser run completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrowserRunResult"
+        "400":
+          description: Invalid URL or blocked destination
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrowserError"
+        "502":
+          description: The page could not be loaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrowserError"
+        "429":
+          description: All browser slots are currently in use
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrowserError"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +72,47 @@ components:
           type: string
       required:
         - status
+    BrowserRunInput:
+      type: object
+      properties:
+        url:
+          type: string
+          minLength: 1
+          maxLength: 2048
+          format: uri
+      required:
+        - url
+    BrowserRunResult:
+      type: object
+      properties:
+        requestedUrl:
+          type: string
+        finalUrl:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        screenshot:
+          type: string
+          description: Data URL containing a compressed JPEG screenshot
+        elapsedMs:
+          type: integer
+        textExcerpt:
+          type: string
+      required:
+        - requestedUrl
+        - finalUrl
+        - title
+        - status
+        - screenshot
+        - elapsedMs
+        - textExcerpt
+    BrowserError:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
 
