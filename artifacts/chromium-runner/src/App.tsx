@@ -1,245 +1,421 @@
-import { type FormEvent, type ReactNode } from 'react';
-import { useState } from 'react';
+import { type ClipboardEvent as ReactClipboardEvent, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type WheelEvent, useEffect, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
-import { getHealthCheckQueryKey, useHealthCheck, useRunBrowser } from '@workspace/api-client-react';
-import { Activity, ArrowDownRight, ArrowUpRight, Check, CircleAlert, Clock3, Copy, ExternalLink, Globe2, LoaderCircle, LockKeyhole, ScanSearch, ShieldCheck, X } from 'lucide-react';
+import { getHealthCheckQueryKey, useHealthCheck } from '@workspace/api-client-react';
 import {
-  Route,
-  Switch,
-  useLocation,
-  Router as WouterRouter,
-} from 'wouter';
+  ArrowLeft, ArrowRight, Globe2, LockKeyhole, LoaderCircle, RotateCw, ShieldCheck,
+  X, ExternalLink, MousePointer2, Keyboard, Move, AlertCircle, Radio, Copy,
+} from 'lucide-react';
+import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 
 const queryClient = new QueryClient();
+type RemoteState = 'disconnected' | 'connecting' | 'starting' | 'loading' | 'ready' | 'closed' | 'error';
+type BrowserFrame = { image: string; url: string; title: string; status: number; viewport: { width: number; height: number } };
+type BrowserMessage =
+  | { type: 'status'; state: 'starting' | 'loading' | 'ready' | 'closed'; message?: string }
+  | ({ type: 'frame' } & BrowserFrame)
+  | { type: 'error'; message: string };
+type ClientMessage =
+  | { type: 'open'; url: string }
+  | { type: 'navigate'; url: string }
+  | { type: 'back' | 'forward' | 'reload' }
+  | { type: 'pointer'; phase: 'down' | 'move' | 'up'; x: number; y: number; button: number }
+  | { type: 'scroll'; x: number; y: number; deltaX: number; deltaY: number }
+  | { type: 'text'; text: string }
+  | { type: 'key'; key: string };
 
 function Home() {
-  const [url, setUrl] = useState('');
-  const [formError, setFormError] = useState('');
-  const [copied, setCopied] = useState(false);
-  const runBrowser = useRunBrowser();
-  const health = useHealthCheck({ query: { queryKey: getHealthCheckQueryKey() } });
-  const result = runBrowser.data;
-  const busy = runBrowser.isPending;
+  const [address, setAddress] = useState('');
+  const [currentUrl, setCurrentUrl] = useState('');
+  const [frame, setFrame] = useState<BrowserFrame | null>(null);
+  const [remoteState, setRemoteState] = useState<RemoteState>('disconnected');
+  const [socketError, setSocketError] = useState('');
+  const [addressError, setAddressError] = useState('');
+  const [notice, setNotice] = useState('');
+  const socketRef = useRef<WebSocket | null>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const lastPointerMoveRef = useRef(0);
+  const addressEditingRef = useRef(false);
+  const health = useHealthCheck({ query: { queryKey: getHealthCheckQueryKey(), refetchInterval: 30000 } });
+  const connected = remoteState !== 'disconnected' && remoteState !== 'closed' && remoteState !== 'error';
+  const busy = remoteState === 'connecting' || remoteState === 'starting' || remoteState === 'loading';
+
+  function send(message: ClientMessage) {
+    const socket = socketRef.current;
+    if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
+  }
+
+  function closeSession() {
+    socketRef.current?.close();
+    socketRef.current = null;
+    setRemoteState('disconnected');
+    setFrame(null);
+    setCurrentUrl('');
+    setSocketError('');
+    setNotice('');
+  }
+
+  function startSession(url: string) {
+    socketRef.current?.close();
+    setFrame(null);
+    setSocketError('');
+    setNotice('');
+    setCurrentUrl(url);
+    setAddress(url);
+    addressEditingRef.current = false;
+    setRemoteState('connecting');
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const socket = new WebSocket(`${protocol}//${window.location.host}/api/browser/ws`);
+    socketRef.current = socket;
+    socket.addEventListener('open', () => {
+      if (socketRef.current !== socket) return;
+      setRemoteState('starting');
+      socket.send(JSON.stringify({ type: 'open', url } satisfies ClientMessage));
+    });
+    socket.addEventListener('message', (event: MessageEvent<string>) => {
+      if (socketRef.current !== socket) return;
+      try {
+        const message = JSON.parse(event.data) as BrowserMessage;
+        if (message.type === 'status') {
+          setRemoteState(message.state);
+          if (message.message) setNotice(message.message);
+          if (message.state === 'closed') {
+            socketRef.current = null;
+            setRemoteState('closed');
+          }
+        } else if (message.type === 'frame') {
+          setFrame({ image: message.image, url: message.url, title: message.title, status: message.status, viewport: message.viewport });
+          if (!addressEditingRef.current) setAddress(message.url);
+          setCurrentUrl(message.url);
+          setRemoteState('ready');
+          setNotice('');
+        } else {
+          setSocketError(message.message || 'The remote browser encountered an error.');
+          setRemoteState('error');
+        }
+      } catch {
+        setSocketError('The browser connection returned an unreadable message.');
+        setRemoteState('error');
+      }
+    });
+    socket.addEventListener('error', () => {
+      if (socketRef.current !== socket) return;
+      setSocketError('Could not connect to the remote browser. Check the service and try again.');
+      setRemoteState('error');
+    });
+    socket.addEventListener('close', () => {
+      if (socketRef.current !== socket) return;
+      socketRef.current = null;
+      setRemoteState((state) => state === 'error' ? 'error' : 'closed');
+    });
+  }
+
+  useEffect(() => () => {
+    socketRef.current?.close();
+    socketRef.current = null;
+  }, []);
+
+  function parseAddress(raw: string) {
+    const trimmed = raw.trim();
+    const candidate = /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(trimmed) ? trimmed : `https://${trimmed}`;
+    let parsed: URL;
+    try {
+      parsed = new URL(candidate);
+    } catch {
+      setAddressError('Enter a valid website address.');
+      return null;
+    }
+    if (!['http:', 'https:'].includes(parsed.protocol) || !parsed.hostname) {
+      setAddressError('Only public HTTP and HTTPS websites can be opened.');
+      return null;
+    }
+    setAddressError('');
+    return parsed.toString();
+  }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setFormError('');
-    let parsed: URL;
-    try {
-      parsed = new URL(url.trim());
-    } catch {
-      setFormError('Enter a complete URL, including https://');
-      return;
-    }
-    if (!['http:', 'https:'].includes(parsed.protocol)) {
-      setFormError('Only public HTTP and HTTPS web pages can be opened.');
-      return;
-    }
-    runBrowser.mutate({ data: { url: parsed.toString() } });
-  }
-
-  async function copyFinalUrl() {
-    if (!result?.finalUrl) return;
-    try {
-      await navigator.clipboard.writeText(result.finalUrl);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
-    } catch {
-      setCopied(false);
+    const url = parseAddress(address);
+    if (!url) return;
+    addressEditingRef.current = false;
+    if (connected && socketRef.current?.readyState === WebSocket.OPEN) {
+      navigateTo(url);
+    } else {
+      startSession(url);
     }
   }
 
-  const apiOnline = health.data?.status;
+  function navigateTo(url: string) {
+    const parsed = parseAddress(url);
+    if (!parsed) return;
+    setAddress(parsed);
+    setCurrentUrl(parsed);
+    setFrame(null);
+    setRemoteState('loading');
+    send({ type: 'navigate', url: parsed });
+  }
+
+  function normalizedPoint(event: ReactPointerEvent<HTMLDivElement>) {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width)),
+      y: Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height)),
+    };
+  }
+
+  function pointer(event: ReactPointerEvent<HTMLDivElement>, phase: 'down' | 'move' | 'up') {
+    if (!frame) return;
+    if (phase === 'down') {
+      event.currentTarget.focus();
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
+    const point = normalizedPoint(event);
+    const button = phase === 'move'
+      ? event.buttons === 2 ? 2 : event.buttons === 4 ? 1 : 0
+      : event.button;
+    send({ type: 'pointer', phase, ...point, button });
+    if (phase === 'up' && event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  function scroll(event: WheelEvent<HTMLDivElement>) {
+    if (!frame) return;
+    event.preventDefault();
+    const bounds = event.currentTarget.getBoundingClientRect();
+    send({
+      type: 'scroll',
+      x: Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width)),
+      y: Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height)),
+      deltaX: event.deltaX,
+      deltaY: event.deltaY,
+    });
+  }
+
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (!frame) return;
+    event.preventDefault();
+    if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      send({ type: 'text', text: event.key });
+      return;
+    }
+    if (['Control', 'Alt', 'Shift', 'Meta'].includes(event.key)) return;
+    const key = [
+      event.ctrlKey ? 'Control+' : '',
+      event.metaKey ? 'Meta+' : '',
+      event.altKey ? 'Alt+' : '',
+      event.shiftKey ? 'Shift+' : '',
+      event.key,
+    ].join('');
+    send({ type: 'key', key });
+  }
+
+  function handlePaste(event: ReactClipboardEvent<HTMLDivElement>) {
+    const text = event.clipboardData.getData('text');
+    if (text && frame) {
+      event.preventDefault();
+      send({ type: 'text', text });
+    }
+  }
+
+  const serviceLabel = health.isLoading ? 'CHECKING SERVICE' : health.isError
+    ? 'SERVICE UNAVAILABLE' : `SERVICE ${String(health.data?.status ?? 'READY').toUpperCase()}`;
+  const connectionLabel = remoteState === 'ready' ? 'LIVE SESSION' : remoteState === 'loading' ? 'NAVIGATING'
+    : remoteState === 'starting' || remoteState === 'connecting' ? 'CONNECTING'
+      : remoteState === 'error' ? 'CONNECTION ERROR' : remoteState === 'closed' ? 'SESSION ENDED' : 'NO SESSION';
 
   return (
-    <main className="runner-shell min-h-[100dvh] px-4 pb-16 sm:px-8">
-      <div className="mx-auto max-w-[1100px]">
-        <header className="flex h-[76px] items-center justify-between border-b border-[#d9d7cf]">
-          <div className="flex items-center gap-3">
-            <div className="grid h-9 w-9 place-items-center rounded-xl bg-[#244a4a] text-[#f5f0df]">
-              <ScanSearch size={19} strokeWidth={2.1} />
-            </div>
-            <div className="leading-tight">
-              <p className="text-[14px] font-extrabold tracking-[-.04em]">Chromium Runner</p>
-              <p className="mono mt-1 text-[9px] uppercase tracking-[.16em] text-[#77817f]">Remote page inspection</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 rounded-full border border-[#d9d7cf] bg-[#faf9f5] px-3 py-1.5">
-            <span className={`h-1.5 w-1.5 rounded-full ${health.isLoading ? 'animate-pulse bg-[#c18a3d]' : health.isError ? 'bg-[#c65b4d]' : 'bg-[#408b69]'}`} />
-            <span className="mono text-[10px] tracking-[.04em] text-[#58656a]" data-testid="status-service">
-              {health.isLoading ? 'CHECKING SERVICE' : health.isError ? 'SERVICE UNAVAILABLE' : `SERVICE ${String(apiOnline ?? 'READY').toUpperCase()}`}
-            </span>
-          </div>
-        </header>
+    <main className="runner-shell">
+      <header className="topbar">
+        <div className="brand">
+          <div className="brand-mark" aria-hidden="true"><Globe2 size={19} strokeWidth={1.8} /></div>
+          <div><div className="brand-name">Chromium Runner</div><div className="brand-caption">YOUR REMOTE BROWSER</div></div>
+        </div>
+        <div className="topbar-status">
+          <span className={`service-led ${health.isLoading ? 'is-loading' : health.isError ? 'is-error' : 'is-online'}`} />
+          <span data-testid="status-service">{serviceLabel}</span>
+          <span className="status-divider" />
+          <span className={`session-led ${connected ? 'is-live' : remoteState === 'error' ? 'is-error' : ''}`} />
+          <span data-testid="status-connection">{connectionLabel}</span>
+        </div>
+      </header>
 
-        <section className="grid gap-10 pb-9 pt-11 md:grid-cols-[1fr_270px] md:items-end md:pt-[66px]">
-          <div className="slide-in">
-            <div className="mono mb-4 flex items-center gap-2 text-[10px] font-medium uppercase tracking-[.22em] text-[#a15a38]">
-              <span className="h-px w-7 bg-[#c27850]" /> A browser, at arm’s length
+      <div className="workspace">
+        <section className="browser-app" aria-label="Remote browser">
+          <div className="window-heading">
+            <div>
+              <p className="eyebrow">A private window, running elsewhere</p>
+              <h1>Browse from here.</h1>
             </div>
-            <h1 className="max-w-[700px] text-[clamp(2.5rem,6vw,4.6rem)] font-semibold leading-[.99] tracking-[-.075em] text-[#26343c]">
-              See what a page<br className="hidden sm:block" /> <span className="font-normal text-[#75817f]">actually looks like.</span>
-            </h1>
-            <p className="mt-5 max-w-[550px] text-[14px] leading-6 text-[#667276]">
-              Open a public web page in a clean remote Chromium session. Get the rendered view and the details that matter, without setting up browser tooling.
-            </p>
+            <div className="session-chip"><span className="pulse-dot" /> EPHEMERAL SESSION</div>
           </div>
-          <div className="hidden border-l border-[#d5d2c8] pb-1 pl-5 md:block">
-            <div className="mono text-[9px] uppercase tracking-[.2em] text-[#8c918a]">Session profile</div>
-            <div className="mt-3 flex items-center gap-2 text-[12px] font-semibold text-[#37484d]"><Globe2 size={15} className="text-[#477c73]" /> Fresh Chromium session</div>
-            <div className="mt-2 flex items-center gap-2 text-[11px] text-[#7b8582]"><ShieldCheck size={14} /> Public web only</div>
-          </div>
-        </section>
 
-        <section className="panel-shadow rounded-[18px] border border-[#e0ded6] bg-[#fbfaf6] p-5 sm:p-7">
-          <form onSubmit={submit}>
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <label htmlFor="target-url" className="text-[13px] font-bold tracking-[-.02em] text-[#34434a]">Page to inspect</label>
-              <span className="mono hidden text-[9px] uppercase tracking-[.14em] text-[#9a9e96] sm:block">HTTP / HTTPS</span>
-            </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <div className={`flex min-w-0 flex-1 items-center gap-3 rounded-[10px] border bg-white px-4 transition-colors focus-within:border-[#5c9587] focus-within:ring-2 focus-within:ring-[#5c9587]/15 ${formError ? 'border-[#d77664]' : 'border-[#d9dcd6]'}`}>
-                <Globe2 size={17} className="shrink-0 text-[#8b9996]" />
-                <input
-                  id="target-url"
-                  data-testid="input-target-url"
-                  type="url"
-                  value={url}
-                  onChange={(event) => { setUrl(event.target.value); setFormError(''); }}
-                  placeholder="https://example.com"
-                  autoComplete="url"
-                  required
-                  className="h-[50px] min-w-0 flex-1 bg-transparent text-[14px] text-[#27383e] outline-none placeholder:text-[#a7aeaa]"
-                  aria-describedby="url-guidance"
-                />
-                {url && <button type="button" onClick={() => { setUrl(''); setFormError(''); }} aria-label="Clear URL" data-testid="button-clear-url" className="grid h-7 w-7 place-items-center rounded-md text-[#9ba29c] hover:bg-[#f0f0e9] hover:text-[#3b4b4d]"><X size={15} /></button>}
+          <div className="browser-chrome">
+            <div className="toolbar">
+              <div className="history-controls">
+                <button type="button" className="icon-button" aria-label="Go back" title="Back" disabled={!connected} onClick={() => send({ type: 'back' })} data-testid="button-back"><ArrowLeft size={17} /></button>
+                <button type="button" className="icon-button" aria-label="Go forward" title="Forward" disabled={!connected} onClick={() => send({ type: 'forward' })} data-testid="button-forward"><ArrowRight size={17} /></button>
+                <button type="button" className="icon-button" aria-label="Reload page" title="Reload" disabled={!connected} onClick={() => { setRemoteState('loading'); send({ type: 'reload' }); }} data-testid="button-reload"><RotateCw size={16} className={remoteState === 'loading' ? 'turning' : ''} /></button>
               </div>
-              <button
-                type="submit"
-                disabled={busy || !url.trim()}
-                data-testid="button-run-browser"
-                className="flex h-[52px] shrink-0 items-center justify-center gap-2 rounded-[10px] bg-[#275c56] px-6 text-[13px] font-bold text-[#f8f4e8] transition-all hover:bg-[#1e4b46] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {busy ? <><LoaderCircle size={16} className="animate-spin" /> Opening page…</> : <>Open in Chromium <ArrowUpRight size={16} /></>}
+              <form className="address-form" onSubmit={submit} aria-label="Navigate to website">
+                <LockKeyhole size={14} className="address-lock" aria-hidden="true" />
+                <input
+                  aria-label="Website address"
+                  data-testid="input-target-url"
+                  value={address}
+                  onFocus={() => { addressEditingRef.current = true; }}
+                  onBlur={() => { addressEditingRef.current = false; }}
+                  onChange={(event) => { setAddress(event.target.value); setAddressError(''); }}
+                  placeholder="Search or enter a website address"
+                  autoComplete="url"
+                  spellCheck={false}
+                />
+                {address && <button type="button" className="clear-address" aria-label="Clear address" data-testid="button-clear-url" onClick={() => { setAddress(''); setAddressError(''); }}><X size={14} /></button>}
+                <button className="go-button" type="submit" aria-label="Navigate" data-testid="button-navigate"><ArrowRight size={16} /></button>
+              </form>
+              <button type="button" className="new-session-button" onClick={() => { closeSession(); window.setTimeout(() => document.querySelector<HTMLInputElement>('[data-testid="input-target-url"]')?.focus(), 0); }} data-testid="button-new-session">
+                <span className="new-session-plus">+</span><span className="new-session-label">New session</span>
               </button>
             </div>
-            <div className="mt-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <p id="url-guidance" className="flex items-center gap-1.5 text-[11px] text-[#858e8a]"><LockKeyhole size={12} /> Only public HTTP and HTTPS pages are supported.</p>
-              {formError && <p role="alert" className="text-[11px] font-semibold text-[#b45448]" data-testid="text-url-error">{formError}</p>}
-            </div>
-          </form>
-        </section>
+            {(addressError || socketError) && (
+              <div className="inline-alert" role="alert" data-testid={addressError ? 'text-address-error' : 'status-browser-error'}>
+                <AlertCircle size={14} /><span>{addressError || socketError}</span>
+                {remoteState === 'error' && currentUrl && <button type="button" onClick={() => startSession(currentUrl)} data-testid="button-retry">Try again</button>}
+                {addressError && <button type="button" aria-label="Dismiss address error" onClick={() => setAddressError('')}><X size={13} /></button>}
+              </div>
+            )}
+            <div className="viewport-frame">
+              <div className="viewport-toolbar">
+                <div className="window-dots" aria-hidden="true"><i /><i /><i /></div>
+                <div className="tab-title" title={frame?.title || currentUrl || 'New tab'} data-testid="text-page-title">
+                  <Globe2 size={13} /> <span>{frame?.title || (currentUrl ? new URL(currentUrl).hostname : 'New tab')}</span>
+                </div>
+                <div className="viewport-meta">
+                  {frame && <span className={`http-status ${frame.status >= 400 ? 'http-bad' : ''}`} data-testid="status-http">{frame.status}</span>}
+                  {frame?.url && <a href={frame.url} target="_blank" rel="noreferrer" className="open-external" title="Open this address in your local browser" aria-label="Open address in local browser" data-testid="link-open-page"><ExternalLink size={14} /></a>}
+                </div>
+              </div>
 
-        {runBrowser.isError && (
-          <div role="alert" data-testid="status-run-error" className="slide-in mt-5 flex items-start gap-3 rounded-xl border border-[#e6bdb2] bg-[#fff5f1] px-5 py-4 text-[#8b463d]">
-            <CircleAlert size={18} className="mt-0.5 shrink-0" />
-            <div className="min-w-0">
-              <p className="text-[13px] font-bold">This page couldn’t be opened</p>
-              <p className="mt-1 text-[12px] leading-5 text-[#98635b]">{runBrowser.error instanceof Error ? runBrowser.error.message : 'The remote browser could not load this address. Check the URL and try again.'}</p>
+              <div
+                className={`remote-viewport ${frame ? 'has-frame' : ''}`}
+                ref={viewportRef}
+                tabIndex={frame ? 0 : -1}
+                role="application"
+                aria-label={frame ? `Interactive remote browser page: ${frame.title || frame.url}` : 'Remote browser viewport'}
+                data-testid="canvas-browser"
+                onPointerDown={(event) => pointer(event, 'down')}
+                onPointerMove={(event) => {
+                  const now = performance.now();
+                  if (now - lastPointerMoveRef.current >= 50) {
+                    lastPointerMoveRef.current = now;
+                    pointer(event, 'move');
+                  }
+                }}
+                onPointerUp={(event) => pointer(event, 'up')}
+                onWheel={scroll}
+                onContextMenu={(event) => event.preventDefault()}
+                onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
+              >
+                {frame && (
+                  <img
+                    className="remote-frame"
+                    src={frame.image}
+                    alt={`Live remote browser view: ${frame.title || frame.url}`}
+                    draggable={false}
+                    data-testid="img-browser-frame"
+                  />
+                )}
+                {!frame && (
+                  <div className={`viewport-empty ${busy ? 'is-busy' : ''}`} aria-live="polite">
+                    {busy ? (
+                      <>
+                        <div className="loading-orbit"><LoaderCircle size={27} /></div>
+                        <p className="empty-kicker">{remoteState === 'connecting' ? 'OPENING A SECURE CHANNEL' : 'REMOTE CHROMIUM IS WORKING'}</p>
+                        <h2>{remoteState === 'loading' ? 'Going to the next page.' : 'Starting your browser.'}</h2>
+                        <p className="empty-copy">{notice || 'Your page will appear here as soon as the remote window is ready.'}</p>
+                        <div className="loading-track"><span /></div>
+                      </>
+                    ) : remoteState === 'error' ? (
+                      <>
+                        <div className="empty-icon error-icon"><AlertCircle size={22} /></div>
+                        <p className="empty-kicker">THE CONNECTION NEEDS ATTENTION</p>
+                        <h2>We lost the remote window.</h2>
+                        <p className="empty-copy">{socketError || 'The browser session could not be reached.'}</p>
+                        {currentUrl && <button className="retry-button" type="button" onClick={() => startSession(currentUrl)} data-testid="button-retry-empty">Reconnect to page</button>}
+                      </>
+                    ) : (
+                      <>
+                        <div className="empty-icon"><Globe2 size={23} /></div>
+                        <p className="empty-kicker">YOUR WINDOW IS READY WHEN YOU ARE</p>
+                        <h2>Where do you want to go?</h2>
+                        <p className="empty-copy">Enter a public website above. The live remote page will appear in this window.</p>
+                        <div className="empty-hint"><MousePointer2 size={14} /> Click, drag, scroll and type directly in the page</div>
+                      </>
+                    )}
+                  </div>
+                )}
+                {busy && frame && <div className="page-loading-bar" aria-label="Page loading"><span /></div>}
+              </div>
+              <div className="viewport-foot">
+                <span><Radio size={12} /> {connected ? 'REMOTE VIEW CONNECTED' : 'REMOTE VIEW STANDBY'}</span>
+                <span>{frame ? `${frame.viewport.width} × ${frame.viewport.height} REMOTE` : '1280 × 800 REMOTE VIEW'}</span>
+              </div>
             </div>
           </div>
-        )}
 
-        {busy && (
-          <section className="mt-7 grid gap-5 lg:grid-cols-[1.55fr_1fr]" aria-live="polite" data-testid="status-loading">
-            <div className="overflow-hidden rounded-[15px] border border-[#d8d9d1] bg-[#fbfaf6]">
-              <div className="flex h-10 items-center gap-2 border-b border-[#e4e3dc] px-4"><span className="h-2 w-2 rounded-full bg-[#d6d4cd]" /><span className="h-2 w-2 rounded-full bg-[#d6d4cd]" /><span className="h-2 w-2 rounded-full bg-[#d6d4cd]" /><span className="ml-3 h-4 w-1/2 animate-pulse rounded bg-[#ecebe4]" /></div>
-              <div className="flex min-h-[300px] flex-col items-center justify-center bg-[#eeeee8] p-8">
-                <div className="relative mb-5 grid h-16 w-16 place-items-center rounded-full border border-[#d4d8cf] bg-[#f7f6f1] text-[#528177]"><LoaderCircle size={25} className="animate-spin" /><span className="absolute -right-1 -top-1 h-3 w-3 animate-pulse rounded-full bg-[#d58c55]" /></div>
-                <p className="text-[14px] font-bold text-[#44545a]">Starting a clean session</p>
-                <p className="mt-2 text-[11px] text-[#87908c]">Navigating to the public page and capturing its render</p>
-              </div>
+          <div className="interaction-row">
+            <div className="interaction-copy">
+              <div className="interaction-symbol"><Move size={16} /></div>
+              <div><strong>It’s a real browser, not a picture.</strong><span>Interact with the page as if it were open on your own screen.</span></div>
             </div>
-            <div className="space-y-3">
-              {[0, 1, 2].map((item) => <div key={item} className="h-[88px] animate-pulse rounded-xl border border-[#e0ded6] bg-[#fbfaf6] p-4"><div className="h-2 w-16 rounded bg-[#e5e3db]" /><div className="mt-4 h-3 w-3/4 rounded bg-[#eeece5]" /></div>)}
+            <div className="control-legend">
+              <span><MousePointer2 size={13} /> Click & drag</span>
+              <span><Move size={13} /> Scroll</span>
+              <span><Keyboard size={13} /> Type & paste</span>
             </div>
+          </div>
+        </section>
+
+        <aside className="side-rail">
+          <section className="rail-card safety-card">
+            <div className="rail-icon"><ShieldCheck size={18} /></div>
+            <p className="rail-eyebrow">A clean start, every time</p>
+            <h2>Nothing follows you.</h2>
+            <p>Each connection opens one isolated browser session. When it ends, its cookies and login data are discarded.</p>
+            <div className="rail-rule" />
+            <div className="safety-line"><span className="safety-check">01</span><span>Separate remote browser</span></div>
+            <div className="safety-line"><span className="safety-check">02</span><span>No saved browsing data</span></div>
           </section>
-        )}
 
-        {result && !busy && (
-          <section className="slide-in mt-8" data-testid="result-browser-run">
-            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <div className="mono mb-2 text-[9px] uppercase tracking-[.2em] text-[#9a6b4b]">Inspection result</div>
-                <h2 className="max-w-[720px] truncate text-[20px] font-bold tracking-[-.045em] text-[#2d3b42]" data-testid="text-page-title">{result.title || 'Untitled page'}</h2>
-              </div>
-              <div className="flex items-center gap-2 rounded-full border border-[#d7e5d9] bg-[#edf5ed] px-3 py-1.5 text-[#477554]" data-testid="status-http">
-                <span className={`h-1.5 w-1.5 rounded-full ${result.status < 400 ? 'bg-[#509667]' : 'bg-[#c96c50]'}`} />
-                <span className="mono text-[10px] font-medium">HTTP {result.status}</span>
-              </div>
-            </div>
-            <div className="grid gap-5 lg:grid-cols-[1.55fr_1fr]">
-              <div className="browser-window overflow-hidden rounded-[15px] border border-[#d4d6cf] bg-white">
-                <div className="flex h-[42px] items-center gap-2 border-b border-[#e2e3de] bg-[#f8f8f4] px-3">
-                  <span className="h-2 w-2 rounded-full bg-[#df8b7b]" /><span className="h-2 w-2 rounded-full bg-[#e5bb66]" /><span className="h-2 w-2 rounded-full bg-[#7cb18b]" />
-                  <div className="mono ml-2 flex min-w-0 flex-1 items-center gap-2 rounded-md bg-[#eeefe9] px-3 py-1.5 text-[10px] text-[#687775]"><LockKeyhole size={10} className="shrink-0" /><span className="truncate">{result.finalUrl}</span></div>
-                  <a href={result.finalUrl} target="_blank" rel="noreferrer" aria-label="Open final page in a new tab" data-testid="link-open-final-url" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-[#75827f] hover:bg-[#e9ece6]"><ExternalLink size={14} /></a>
-                </div>
-                <img src={result.screenshot} alt={`Screenshot of ${result.title || result.finalUrl}`} data-testid="img-browser-screenshot" className="block h-auto max-h-[610px] min-h-[220px] w-full object-contain object-top bg-[#e7e7e1]" />
-              </div>
-              <div className="flex flex-col gap-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-xl border border-[#e0ded6] bg-[#fbfaf6] p-4">
-                    <div className="mono flex items-center gap-1.5 text-[9px] uppercase tracking-[.13em] text-[#8e9791]"><Clock3 size={12} /> Elapsed</div>
-                    <p className="mono mt-3 text-[22px] font-medium tracking-[-.06em] text-[#33464a]" data-testid="text-elapsed-time">{result.elapsedMs.toLocaleString()}<span className="ml-1 text-[11px] text-[#828d88]">ms</span></p>
-                  </div>
-                  <div className="rounded-xl border border-[#e0ded6] bg-[#fbfaf6] p-4">
-                    <div className="mono flex items-center gap-1.5 text-[9px] uppercase tracking-[.13em] text-[#8e9791]"><Activity size={12} /> Response</div>
-                    <p className="mono mt-3 text-[22px] font-medium tracking-[-.06em] text-[#33464a]">{result.status}<span className="ml-1 text-[11px] text-[#828d88]">code</span></p>
-                  </div>
-                </div>
-                <div className="rounded-xl border border-[#e0ded6] bg-[#fbfaf6] p-4">
-                  <div className="mono mb-2 text-[9px] uppercase tracking-[.14em] text-[#8e9791]">Final destination</div>
-                  <div className="flex items-start gap-2">
-                    <p className="min-w-0 flex-1 break-all text-[11px] leading-5 text-[#4b6063]" data-testid="text-final-url">{result.finalUrl}</p>
-                    <button type="button" onClick={copyFinalUrl} aria-label="Copy final URL" data-testid="button-copy-final-url" className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-[#e2e2dc] text-[#71817c] hover:bg-[#f0f0ea]">{copied ? <Check size={13} /> : <Copy size={13} />}</button>
-                  </div>
-                  <div className="mt-3 border-t border-[#e8e6df] pt-2 text-[10px] text-[#929991]">Requested <span className="ml-1 break-all text-[#687876]" data-testid="text-requested-url">{result.requestedUrl}</span></div>
-                </div>
-                <div className="rounded-xl border border-[#e0ded6] bg-[#fbfaf6] p-4">
-                  <div className="mb-3 flex items-center justify-between">
-                    <div className="mono text-[9px] uppercase tracking-[.14em] text-[#8e9791]">Page text excerpt</div>
-                    <ArrowDownRight size={14} className="text-[#a2a59d]" />
-                  </div>
-                  <p className="max-h-[180px] overflow-auto whitespace-pre-wrap text-[12px] leading-[1.75] text-[#58666a]" data-testid="text-page-excerpt">{result.textExcerpt || 'No readable text was returned for this page.'}</p>
-                </div>
-              </div>
-            </div>
+          <section className="rail-card public-card">
+            <div className="public-heading"><LockKeyhole size={15} /><span>PUBLIC WEB ONLY</span></div>
+            <p>Only public websites over HTTP or HTTPS can be opened. Never enter passwords or private information.</p>
+            <div className="public-address"><Globe2 size={13} /><span>https://</span><span className="address-lines">••••••••••••</span></div>
           </section>
-        )}
 
-        {!result && !busy && !runBrowser.isError && (
-          <section className="mt-7 flex min-h-[180px] flex-col items-center justify-center rounded-[15px] border border-dashed border-[#d3d5cc] bg-[#faf9f4]/80 px-6 py-8 text-center" data-testid="state-empty">
-            <div className="mb-3 grid h-10 w-10 place-items-center rounded-full border border-[#d9ded5] bg-[#f1f2eb] text-[#52766d]"><Globe2 size={18} /></div>
-            <h2 className="text-[13px] font-bold text-[#526064]">Your page preview will appear here</h2>
-            <p className="mt-1.5 max-w-[330px] text-[11px] leading-5 text-[#8a938e]">Enter a public URL above to capture its rendered page, response details, and a readable text sample.</p>
+          <section className="service-card" aria-label="Remote browser service status">
+            <div className="service-card-top"><span>REMOTE SERVICE</span><span className={`service-indicator ${health.isError ? 'offline' : ''}`} /></div>
+            <strong>{health.isLoading ? 'Checking connection' : health.isError ? 'Service unavailable' : 'Ready for a session'}</strong>
+            <span className="service-detail" data-testid="text-service-detail">{health.isError ? 'Check back in a moment.' : 'One window per connection'}</span>
           </section>
-        )}
-
-        <footer className="mt-9 flex flex-col gap-2 border-t border-[#d8d6ce] pt-4 text-[10px] text-[#858e88] sm:flex-row sm:items-center sm:justify-between">
-          <span className="flex items-center gap-2"><ShieldCheck size={13} className="text-[#66877a]" /> Runs in an isolated remote Chromium session</span>
-          <span className="mono tracking-[.03em]">PUBLIC WEB ONLY <span className="mx-1 text-[#b0b1a8]">/</span> HTTP + HTTPS</span>
-        </footer>
+        </aside>
       </div>
+
+      <footer className="page-footer">
+        <span><ShieldCheck size={13} /> Private to this temporary session</span>
+        <span><Copy size={12} /> Remote pages are not stored here</span>
+        <span className="footer-public">PUBLIC WEB ONLY <i /> HTTP + HTTPS</span>
+      </footer>
     </main>
   );
 }
 
 function Router() {
-  return (
-    // Keep a shared shell (sidebar, navbar) outside the boundary so it
-    // survives a page crash.
-    <RoutedErrorBoundary>
-      <Switch>
-        <Route path="/" component={Home} />
-        <Route component={NotFound} />
-      </Switch>
-    </RoutedErrorBoundary>
-  );
+  return <RoutedErrorBoundary><Switch><Route path="/" component={Home} /><Route component={NotFound} /></Switch></RoutedErrorBoundary>;
 }
 
 function RoutedErrorBoundary({ children }: { children: ReactNode }) {
@@ -251,9 +427,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-          <Router />
-        </WouterRouter>
+        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><Router /></WouterRouter>
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

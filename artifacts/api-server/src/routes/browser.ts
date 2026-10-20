@@ -11,11 +11,11 @@ import {
 import { BlockList, createConnection, isIP, type Socket } from "node:net";
 import type { Duplex } from "node:stream";
 import { chromium } from "playwright";
+import type { BrowserContext, Page } from "playwright";
+import { acquireBrowserSlot, releaseBrowserSlot } from "../lib/browser-limits";
 
 const router: IRouter = Router();
-const MAX_CONCURRENT_RUNS = 2;
 const MAX_TEXT_LENGTH = 900;
-let activeRuns = 0;
 
 const blockedIPv4 = new BlockList();
 for (const [subnet, prefix] of [
@@ -42,7 +42,7 @@ function isPublicIPv4(address: string): boolean {
   return isIP(address) === 4 && !blockedIPv4.check(address, "ipv4");
 }
 
-async function resolvePublicIPv4(hostname: string): Promise<string> {
+export async function resolvePublicIPv4(hostname: string): Promise<string> {
   const normalized = hostname.toLowerCase().replace(/\.$/, "");
   if (
     !normalized ||
@@ -75,7 +75,7 @@ async function resolvePublicIPv4(hostname: string): Promise<string> {
   return answers[0].address;
 }
 
-function getAllowedWebUrl(rawUrl: string): URL {
+export function getAllowedWebUrl(rawUrl: string): URL {
   const url = new URL(rawUrl);
   if (
     !["http:", "https:"].includes(url.protocol) ||
@@ -103,7 +103,7 @@ function getProxyAddress(authority: string, expectedPort: number): URL {
   return destination;
 }
 
-async function startSafeProxy(): Promise<{
+export async function startSafeProxy(): Promise<{
   origin: string;
   close: () => Promise<void>;
 }> {
@@ -113,6 +113,9 @@ async function startSafeProxy(): Promise<{
 
   server.on("connect", (req, client, head) => {
     void establishTunnel(req, client, head);
+  });
+  server.on("upgrade", (req, client, head) => {
+    void establishWebSocketTunnel(req, client, head);
   });
 
   await new Promise<void>((resolve, reject) => {
@@ -211,14 +214,83 @@ async function startSafeProxy(): Promise<{
       }
     }
   }
+
+  async function establishWebSocketTunnel(
+    req: IncomingMessage,
+    client: Duplex,
+    head: Buffer,
+  ): Promise<void> {
+    let upstream: Socket | undefined;
+    try {
+      const requestUrl = new URL(req.url ?? "");
+      if (requestUrl.protocol === "ws:") requestUrl.protocol = "http:";
+      const destination = getAllowedWebUrl(requestUrl.href);
+      if (
+        destination.protocol !== "http:" ||
+        destination.port !== "" ||
+        req.headers.upgrade?.toLowerCase() !== "websocket"
+      ) {
+        client.destroy();
+        return;
+      }
+      const address = await resolvePublicIPv4(destination.hostname);
+      upstream = createConnection({ host: address, family: 4, port: 80 });
+      upstream.once("connect", () => {
+        const headers: IncomingHttpHeaders = {
+          ...req.headers,
+          host: destination.host,
+          connection: "Upgrade",
+        };
+        delete headers["proxy-connection"];
+        const headerLines = Object.entries(headers)
+          .filter(([, value]) => value !== undefined)
+          .flatMap(([name, value]) =>
+            (Array.isArray(value) ? value : [value]).map(
+              (item) => `${name}: ${item}`,
+            ),
+          )
+          .join("\r\n");
+        upstream?.write(
+          `${req.method ?? "GET"} ${destination.pathname}${destination.search} HTTP/1.1\r\n${headerLines}\r\n\r\n`,
+        );
+        if (head.length) upstream?.write(head);
+        client.pipe(upstream!);
+        upstream!.pipe(client);
+      });
+      upstream.once("error", () => client.destroy());
+      client.once("error", () => upstream?.destroy());
+      client.once("close", () => upstream?.destroy());
+    } catch {
+      client.destroy();
+    }
+  }
+}
+
+export async function guardPageRequests(
+  target: Page | BrowserContext,
+): Promise<void> {
+  await target.route("**/*", async (route) => {
+    try {
+      const destination = new URL(route.request().url());
+      if (destination.protocol === "ws:") {
+        destination.protocol = "http:";
+      } else if (destination.protocol === "wss:") {
+        destination.protocol = "https:";
+      }
+      if (!["http:", "https:"].includes(destination.protocol)) {
+        await route.abort("blockedbyclient");
+        return;
+      }
+      getAllowedWebUrl(destination.href);
+      await resolvePublicIPv4(destination.hostname);
+      await route.continue();
+    } catch {
+      await route.abort("blockedbyclient");
+    }
+  });
 }
 
 router.post("/browser/run", async (req, res): Promise<void> => {
-  if (activeRuns >= MAX_CONCURRENT_RUNS) {
-    res.status(429).json({ error: "Chromium is busy. Please try again shortly." });
-    return;
-  }
-
   const parsed = RunBrowserBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Enter a valid HTTP or HTTPS web address." });
@@ -236,7 +308,10 @@ router.post("/browser/run", async (req, res): Promise<void> => {
     return;
   }
 
-  activeRuns += 1;
+  if (!acquireBrowserSlot()) {
+    res.status(429).json({ error: "Chromium is busy. Please try again shortly." });
+    return;
+  }
   const startedAt = Date.now();
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
   let proxy: Awaited<ReturnType<typeof startSafeProxy>> | undefined;
@@ -255,20 +330,7 @@ router.post("/browser/run", async (req, res): Promise<void> => {
       javaScriptEnabled: true,
     });
     const page = await context.newPage();
-    await page.route("**/*", async (route) => {
-      try {
-        const destination = new URL(route.request().url());
-        if (!["http:", "https:"].includes(destination.protocol)) {
-          await route.abort("blockedbyclient");
-          return;
-        }
-        getAllowedWebUrl(destination.href);
-        await resolvePublicIPv4(destination.hostname);
-        await route.continue();
-      } catch {
-        await route.abort("blockedbyclient");
-      }
-    });
+    await guardPageRequests(page);
 
     const response = await page.goto(requestedUrl.href, {
       waitUntil: "domcontentloaded",
@@ -305,7 +367,7 @@ router.post("/browser/run", async (req, res): Promise<void> => {
   } finally {
     if (browser) await browser.close().catch(() => undefined);
     if (proxy) await proxy.close().catch(() => undefined);
-    activeRuns -= 1;
+    releaseBrowserSlot();
   }
 });
 
