@@ -1,7 +1,15 @@
 import type { Server, IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHmac,
+  randomBytes,
+} from "node:crypto";
+import { eq } from "drizzle-orm";
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
 import { WebSocket, WebSocketServer } from "ws";
+import { browserProfilesTable, db } from "@workspace/db";
 import {
   getAllowedWebUrl,
   guardPageRequests,
@@ -13,6 +21,8 @@ import { acquireBrowserSlot, releaseBrowserSlot } from "./browser-limits";
 const WIDTH = 1280;
 const HEIGHT = 800;
 const FRAME_INTERVAL_MS = 750;
+const PROFILE_SAVE_DEBOUNCE_MS = 1_200;
+const PROFILE_SAVE_INTERVAL_MS = 10_000;
 const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 const allowedKeys = new Set([
   "Alt",
@@ -36,7 +46,9 @@ const allowedKeys = new Set([
 ]);
 
 type BrowserMessage =
-  | { type: "open" | "navigate"; url: string }
+  | { type: "open"; url: string; profileToken: string }
+  | { type: "navigate"; url: string }
+  | { type: "clearProfile"; profileToken: string }
   | { type: "back" | "forward" | "reload" }
   | {
       type: "pointer";
@@ -64,8 +76,14 @@ type BrowserSession = {
   page: Page | null;
   proxy: SafeProxy | null;
   frameTimer: NodeJS.Timeout | null;
+  profileTimer: NodeJS.Timeout | null;
+  profileSaveTimer: NodeJS.Timeout | null;
   lastActivity: number;
   responseStatus: number;
+  profileKey: string | null;
+  persistedStateJson: string | null;
+  profileCleared: boolean;
+  profileOperation: Promise<void>;
   capturingFrame: boolean;
   closed: boolean;
   queue: Promise<void>;
@@ -73,6 +91,164 @@ type BrowserSession = {
   cleanupPromise: Promise<void> | null;
   observedPages: WeakSet<Page>;
 };
+
+type SavedStorageState = Awaited<ReturnType<BrowserContext["storageState"]>>;
+
+function secretKey(purpose: string): Buffer {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) {
+    throw new Error("SESSION_SECRET is required to protect browser profiles.");
+  }
+  return createHmac("sha256", secret)
+    .update(`chromium-runner:${purpose}:v1`)
+    .digest();
+}
+
+function deriveProfileKey(profileToken: string): string {
+  return createHmac("sha256", secretKey("profile-lookup"))
+    .update(profileToken)
+    .digest("hex");
+}
+
+function encryptProfileState(profileKey: string, stateJson: string): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", secretKey("profile-encryption"), iv);
+  cipher.setAAD(Buffer.from(profileKey, "utf8"));
+  const ciphertext = Buffer.concat([
+    cipher.update(stateJson, "utf8"),
+    cipher.final(),
+  ]);
+  return JSON.stringify({
+    version: 1,
+    iv: iv.toString("base64"),
+    tag: cipher.getAuthTag().toString("base64"),
+    ciphertext: ciphertext.toString("base64"),
+  });
+}
+
+function decryptProfileState(
+  profileKey: string,
+  encryptedState: string,
+): SavedStorageState {
+  const envelope: unknown = JSON.parse(encryptedState);
+  if (!envelope || typeof envelope !== "object") {
+    throw new Error("Saved browser profile is invalid.");
+  }
+  const record = envelope as Record<string, unknown>;
+  if (
+    record.version !== 1 ||
+    typeof record.iv !== "string" ||
+    typeof record.tag !== "string" ||
+    typeof record.ciphertext !== "string"
+  ) {
+    throw new Error("Saved browser profile is invalid.");
+  }
+
+  const decipher = createDecipheriv(
+    "aes-256-gcm",
+    secretKey("profile-encryption"),
+    Buffer.from(record.iv, "base64"),
+  );
+  decipher.setAAD(Buffer.from(profileKey, "utf8"));
+  decipher.setAuthTag(Buffer.from(record.tag, "base64"));
+  const plaintext = Buffer.concat([
+    decipher.update(Buffer.from(record.ciphertext, "base64")),
+    decipher.final(),
+  ]).toString("utf8");
+  const state: unknown = JSON.parse(plaintext);
+  if (
+    !state ||
+    typeof state !== "object" ||
+    !Array.isArray((state as Record<string, unknown>).cookies) ||
+    !Array.isArray((state as Record<string, unknown>).origins)
+  ) {
+    throw new Error("Saved browser profile is invalid.");
+  }
+  return state as SavedStorageState;
+}
+
+function sendProfileState(
+  session: BrowserSession,
+  state: "empty" | "saving" | "saved" | "error",
+  message?: string,
+): void {
+  send(session, { type: "profile", state, ...(message ? { message } : {}) });
+}
+
+async function loadProfileState(
+  profileKey: string,
+): Promise<SavedStorageState | null> {
+  const [profile] = await db
+    .select({ encryptedState: browserProfilesTable.encryptedState })
+    .from(browserProfilesTable)
+    .where(eq(browserProfilesTable.profileKey, profileKey))
+    .limit(1);
+  if (!profile) return null;
+  const state = decryptProfileState(profileKey, profile.encryptedState);
+  return state;
+}
+
+async function writeProfileState(
+  session: BrowserSession,
+  allowClosed = false,
+): Promise<void> {
+  if (
+    !session.profileKey ||
+    !session.context ||
+    session.context.isClosed() ||
+    session.profileCleared ||
+    (session.closed && !allowClosed)
+  ) {
+    return;
+  }
+  const state = await session.context.storageState({ indexedDB: true });
+  const stateJson = JSON.stringify(state);
+  if (stateJson === session.persistedStateJson) {
+    sendProfileState(session, "saved");
+    return;
+  }
+
+  sendProfileState(session, "saving");
+  const encryptedState = encryptProfileState(session.profileKey, stateJson);
+  await db
+    .insert(browserProfilesTable)
+    .values({
+      profileKey: session.profileKey,
+      encryptedState,
+    })
+    .onConflictDoUpdate({
+      target: browserProfilesTable.profileKey,
+      set: {
+        encryptedState,
+        updatedAt: new Date(),
+      },
+    });
+  session.persistedStateJson = stateJson;
+  sendProfileState(session, "saved");
+}
+
+function persistProfileState(
+  session: BrowserSession,
+  allowClosed = false,
+): Promise<void> {
+  const operation = session.profileOperation.then(() =>
+    writeProfileState(session, allowClosed),
+  );
+  session.profileOperation = operation.catch(() => undefined);
+  return operation;
+}
+
+function scheduleProfileSave(session: BrowserSession): void {
+  if (!session.profileKey || session.closed || session.profileCleared) return;
+  sendProfileState(session, "saving");
+  if (session.profileSaveTimer) clearTimeout(session.profileSaveTimer);
+  session.profileSaveTimer = setTimeout(() => {
+    session.profileSaveTimer = null;
+    void persistProfileState(session).catch(() => {
+      sendProfileState(session, "error", "Could not save this browser profile.");
+    });
+  }, PROFILE_SAVE_DEBOUNCE_MS);
+}
 
 type MessageEventLike = IncomingMessage;
 
@@ -107,9 +283,23 @@ function parseMessage(raw: string): BrowserMessage | null {
   }
   if (!value || typeof value !== "object") return null;
   const message = value as Record<string, unknown>;
-  if (message.type === "open" || message.type === "navigate") {
+  if (message.type === "open") {
+    return typeof message.url === "string" &&
+      message.url.length <= 2048 &&
+      typeof message.profileToken === "string" &&
+      /^[a-f0-9]{64}$/.test(message.profileToken)
+      ? { type: "open", url: message.url, profileToken: message.profileToken }
+      : null;
+  }
+  if (message.type === "navigate") {
     return typeof message.url === "string" && message.url.length <= 2048
-      ? { type: message.type, url: message.url }
+      ? { type: "navigate", url: message.url }
+      : null;
+  }
+  if (message.type === "clearProfile") {
+    return typeof message.profileToken === "string" &&
+      /^[a-f0-9]{64}$/.test(message.profileToken)
+      ? { type: "clearProfile", profileToken: message.profileToken }
       : null;
   }
   if (["back", "forward", "reload"].includes(String(message.type))) {
@@ -213,6 +403,7 @@ function watchPage(session: BrowserSession, page: Page): void {
     }
   });
   page.on("response", (response) => {
+    scheduleProfileSave(session);
     if (
       response.request().isNavigationRequest() &&
       response.frame() === page.mainFrame()
@@ -230,6 +421,7 @@ function watchPage(session: BrowserSession, page: Page): void {
   page.on("load", () => {
     if (session.page === page) {
       sendStatus(session, "ready");
+      scheduleProfileSave(session);
       void captureFrame(session);
     }
   });
@@ -238,12 +430,23 @@ function watchPage(session: BrowserSession, page: Page): void {
   });
 }
 
-async function startSession(session: BrowserSession, rawUrl: string): Promise<void> {
+async function startSession(
+  session: BrowserSession,
+  rawUrl: string,
+  profileToken?: string,
+): Promise<void> {
   sendStatus(session, "starting", "Starting a private Chromium session");
   const target = getAllowedWebUrl(rawUrl);
   await resolvePublicIPv4(target.hostname);
 
   if (!session.browser) {
+    if (!profileToken) {
+      throw new Error("A private browser profile is required.");
+    }
+    session.profileKey = deriveProfileKey(profileToken);
+    const savedState = await loadProfileState(session.profileKey);
+    session.persistedStateJson = savedState ? JSON.stringify(savedState) : null;
+    sendProfileState(session, savedState ? "saved" : "empty");
     session.proxy = await startSafeProxy();
     session.browser = await chromium.launch({
       headless: true,
@@ -255,6 +458,7 @@ async function startSession(session: BrowserSession, rawUrl: string): Promise<vo
       acceptDownloads: false,
       serviceWorkers: "block",
       javaScriptEnabled: true,
+      ...(savedState ? { storageState: savedState } : {}),
     });
     await guardPageRequests(session.context);
     session.context.on("page", (page) => watchPage(session, page));
@@ -275,14 +479,51 @@ async function startSession(session: BrowserSession, rawUrl: string): Promise<vo
   await captureFrame(session);
 }
 
+async function clearProfile(
+  session: BrowserSession,
+  profileToken: string,
+): Promise<void> {
+  const profileKey = deriveProfileKey(profileToken);
+  if (session.profileKey && session.profileKey !== profileKey) {
+    throw new Error("This browser profile does not match the active session.");
+  }
+  session.profileKey = profileKey;
+  session.profileCleared = true;
+  if (session.profileSaveTimer) {
+    clearTimeout(session.profileSaveTimer);
+    session.profileSaveTimer = null;
+  }
+  await session.profileOperation;
+  await db
+    .delete(browserProfilesTable)
+    .where(eq(browserProfilesTable.profileKey, profileKey));
+  session.persistedStateJson = null;
+  sendProfileState(session, "empty");
+  sendStatus(session, "closed", "Saved cookies and site data were cleared.");
+  session.socket.close(1000, "Browser profile cleared");
+}
+
 async function handleMessage(
   session: BrowserSession,
   message: BrowserMessage,
 ): Promise<void> {
   session.lastActivity = Date.now();
+  if (message.type === "clearProfile") {
+    try {
+      await clearProfile(session, message.profileToken);
+    } catch {
+      sendProfileState(session, "error", "Could not clear saved browser data.");
+    }
+    return;
+  }
+
   if (message.type === "open" || message.type === "navigate") {
     try {
-      await startSession(session, message.url);
+      await startSession(
+        session,
+        message.url,
+        message.type === "open" ? message.profileToken : undefined,
+      );
     } catch {
       sendStatus(session, "ready");
       sendError(
@@ -335,7 +576,10 @@ async function handleMessage(
         await page.keyboard.insertText(message.text);
         break;
       case "key":
-        if (!allowedKeys.has(message.key) && !/^(Control|Alt|Meta|Shift)\+[\w]+$/.test(message.key)) {
+        if (
+          !allowedKeys.has(message.key) &&
+          !/^(?:(?:Control|Alt|Meta|Shift)\+)*(?:[A-Za-z0-9]|Arrow(?:Down|Left|Right|Up)|F(?:[1-9]|1[0-2]))$/.test(message.key)
+        ) {
           sendError(session, "That keyboard key is not supported.");
           return;
         }
@@ -343,6 +587,7 @@ async function handleMessage(
         break;
     }
     if (message.type !== "pointer" || message.phase !== "move") {
+      scheduleProfileSave(session);
       await captureFrame(session);
     }
   } catch {
@@ -410,8 +655,14 @@ export function attachBrowserWebSocket(server: Server): void {
       page: null,
       proxy: null,
       frameTimer: null,
+      profileTimer: null,
+      profileSaveTimer: null,
       lastActivity: Date.now(),
       responseStatus: 0,
+      profileKey: null,
+      persistedStateJson: null,
+      profileCleared: false,
+      profileOperation: Promise.resolve(),
       capturingFrame: false,
       closed: false,
       queue: Promise.resolve(),
@@ -429,6 +680,11 @@ export function attachBrowserWebSocket(server: Server): void {
       }
       void captureFrame(session);
     }, FRAME_INTERVAL_MS);
+    session.profileTimer = setInterval(() => {
+      void persistProfileState(session).catch(() => {
+        sendProfileState(session, "error", "Could not save this browser profile.");
+      });
+    }, PROFILE_SAVE_INTERVAL_MS);
 
     socket.on("message", (raw) => {
       const message = parseMessage(raw.toString());
@@ -452,9 +708,17 @@ export function attachBrowserWebSocket(server: Server): void {
       if (session.cleanupPromise) return session.cleanupPromise;
       session.closed = true;
       if (session.frameTimer) clearInterval(session.frameTimer);
+      if (session.profileTimer) clearInterval(session.profileTimer);
+      if (session.profileSaveTimer) {
+        clearTimeout(session.profileSaveTimer);
+        session.profileSaveTimer = null;
+      }
       session.cleanupPromise = (async () => {
         if (session.initializePromise) {
           await session.initializePromise.catch(() => undefined);
+        }
+        if (session.profileKey && !session.profileCleared) {
+          await persistProfileState(session, true).catch(() => undefined);
         }
         if (session.browser) await session.browser.close().catch(() => undefined);
         if (session.proxy) await session.proxy.close().catch(() => undefined);

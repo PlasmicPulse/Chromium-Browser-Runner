@@ -322,3 +322,85 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
 }
+
+/* Full-screen browser surface: keep the controls, remove the landing-page shell. */
+html, body, #root { width: 100%; height: 100%; overflow: hidden; }
+.runner-shell {
+  width: 100%;
+  height: 100dvh;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  background: #eceeea;
+  background-image: none;
+}
+.browser-app { width: 100%; height: 100%; }
+.browser-chrome {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: #f1f3f1;
+}
+.toolbar { flex: none; margin-bottom: 8px; }
+.history-controls { flex: none; }
+.new-session-button { flex: none; }
+.clear-profile-button { flex: none; }
+.viewport-frame {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: 7px;
+}
+.viewport-toolbar { flex: none; }
+.profile-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #7b8881;
+  font: 8px var(--app-font-mono);
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+.profile-status svg { flex: none; }
+.profile-saved { color: #4b7964; }
+.profile-saving { color: #a67945; }
+.profile-error { color: #a34f43; }
+.remote-viewport {
+  flex: 1;
+  min-height: 0;
+  aspect-ratio: auto;
+  background-color: #e9e9e1;
+}
+.remote-viewport.has-frame { min-height: 0; }
+.viewport-foot { flex: none; }
+.viewport-empty { max-width: 430px; }
+.empty-kicker, .loading-track { display: none; }
+.viewport-empty h2 { font-size: 16px; font-weight: 600; }
+.empty-copy { font-size: 11px; }
+.inline-alert { flex: none; margin-bottom: 8px; }
+@media (max-width: 760px) {
+  .runner-shell { padding: 0; }
+  .browser-chrome { padding: 6px; }
+  .toolbar { gap: 4px; }
+  .history-controls { gap: 0; }
+  .new-session-button { width: 34px; min-width: 34px; }
+  .new-session-label { display: none; }
+  .clear-profile-button { width: 29px; }
+  .remote-viewport { min-height: 0; }
+  .viewport-empty { padding: 18px 12px; }
+}
+@media (max-width: 520px) {
+  .address-form { gap: 6px; padding-left: 8px; }
+  .address-form input { font-size: 10px; }
+  .address-form input::placeholder { font-size: 10px; }
+  .profile-status > span { display: none; }
+  .viewport-toolbar { height: 34px; padding: 0 8px; }
+  .viewport-foot { height: 24px; font-size: 7px; }
+}
