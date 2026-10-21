@@ -29,6 +29,16 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Direct health check endpoint at /api for Replit's deployment runner
+app.get("/api", (_req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
+// Direct health check at root just in case
+app.get("/", (_req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
 app.use("/api", router);
 
 export default app;
