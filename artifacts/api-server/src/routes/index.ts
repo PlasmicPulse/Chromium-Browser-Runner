@@ -4,6 +4,11 @@ import browserRouter from "./browser";
 
 const router: IRouter = Router();
 
+// Handle health checks at multiple potential paths
+router.get("/", (_req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
 router.get("/api", (_req, res) => {
   res.status(200).json({ status: "ok" });
 });
