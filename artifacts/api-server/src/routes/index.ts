@@ -4,6 +4,10 @@ import browserRouter from "./browser";
 
 const router: IRouter = Router();
 
+router.get("/api", (_req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
 router.use(healthRouter);
 router.use(browserRouter);
 
