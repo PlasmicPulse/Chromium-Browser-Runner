@@ -4,3 +4,4 @@
 - [Browser display requirements](display-requirements.md) — Fit width with scrolling, in-page maximization rather than native fullscreen, and a normal mouse cursor.
 - [Auth provisioning](auth-provisioning.md) — Managed Clerk rejects archive-style project titles ending in .zip; rename the project before provisioning.
 - [Shared proxy rate limits](shared-proxy-limits.md) — Express req.ip may identify the shared proxy, so IP-only cooldowns can throttle unrelated visitors together.
+- [Chat identity](chat-identity.md) — Display names are unverified and may collide; matching names do not establish sender identity or message ownership.
