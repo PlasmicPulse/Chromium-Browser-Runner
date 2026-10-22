@@ -9,6 +9,103 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Read this browser's activity logging preference
+ */
+export const GetActivityConsentResponse = zod.object({
+  "decided": zod.boolean(),
+  "enabled": zod.boolean(),
+  "deviceId": zod.string().nullable(),
+  "token": zod.string().nullable()
+})
+
+
+/**
+ * @summary Opt in or stop activity logging
+ */
+export const SetActivityConsentBody = zod.object({
+  "enabled": zod.boolean()
+})
+
+export const SetActivityConsentResponse = zod.object({
+  "decided": zod.boolean(),
+  "enabled": zod.boolean(),
+  "deviceId": zod.string().nullable(),
+  "token": zod.string().nullable()
+})
+
+
+/**
+ * @summary Record a return visit only for a consenting browser
+ */
+export const RecordDeviceAccessResponse = zod.void()
+
+
+/**
+ * @summary Owner authorization for the current verified account
+ */
+export const GetOwnerAccessResponse = zod.object({
+  "signedIn": zod.boolean(),
+  "owner": zod.boolean()
+})
+
+
+/**
+ * @summary List consenting browsers, newest first
+ */
+export const listVisitorDevicesQueryPageDefault = 1;
+export const listVisitorDevicesQueryPageMax = 1000000;
+
+
+
+export const ListVisitorDevicesQueryParams = zod.object({
+  "page": zod.coerce.number().int().min(1).max(listVisitorDevicesQueryPageMax).default(listVisitorDevicesQueryPageDefault)
+})
+
+export const ListVisitorDevicesResponse = zod.object({
+  "devices": zod.array(zod.object({
+  "deviceId": zod.string(),
+  "firstSeen": zod.coerce.date(),
+  "lastSeen": zod.coerce.date(),
+  "browser": zod.string(),
+  "platform": zod.string(),
+  "username": zod.string().nullable(),
+  "isNew": zod.boolean(),
+  "consentActive": zod.boolean()
+})),
+  "total": zod.number().int(),
+  "newCount": zod.number().int(),
+  "page": zod.number().int(),
+  "pageSize": zod.number().int()
+})
+
+
+/**
+ * @summary Mark the specified new browsers as reviewed
+ */
+export const reviewVisitorDevicesBodyDeviceIdsMax = 50;
+
+
+
+export const ReviewVisitorDevicesBody = zod.object({
+  "deviceIds": zod.array(zod.string().uuid()).min(1).max(reviewVisitorDevicesBodyDeviceIdsMax)
+})
+
+export const ReviewVisitorDevicesResponse = zod.void()
+
+
+/**
+ * @summary Download timestamped consenting chat records
+ */
+export const DownloadChatLogResponse = zod.string()
+
+
+/**
+ * @summary Download timestamped consenting browsing records
+ */
+export const DownloadVisitLogResponse = zod.string()
+
+
+/**
  * @summary Latest 50 shared messages, oldest first
  */
 export const ListChatMessagesResponseItem = zod.object({

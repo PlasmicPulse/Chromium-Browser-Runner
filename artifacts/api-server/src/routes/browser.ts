@@ -13,6 +13,7 @@ import type { Duplex } from "node:stream";
 import { chromium } from "playwright";
 import type { BrowserContext, Page } from "playwright";
 import { acquireBrowserSlot, releaseBrowserSlot } from "../lib/browser-limits";
+import { recordVisit, requestDeviceToken } from "../lib/visitor-activity";
 
 const router: IRouter = Router();
 const MAX_TEXT_LENGTH = 900;
@@ -330,6 +331,14 @@ router.post("/browser/run", async (req, res): Promise<void> => {
       javaScriptEnabled: true,
     });
     const page = await context.newPage();
+    const trackingToken = requestDeviceToken(req);
+    page.on("framenavigated", (frame) => {
+      if (frame === page.mainFrame()) {
+        void recordVisit(trackingToken, frame.url()).catch((err) => {
+          req.log.warn({ err }, "Consented page activity could not be saved");
+        });
+      }
+    });
     await guardPageRequests(page);
 
     const response = await page.goto(requestedUrl.href, {

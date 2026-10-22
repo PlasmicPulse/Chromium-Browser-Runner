@@ -20,12 +20,18 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  ActivityConsent,
+  ActivityConsentInput,
   BrowserError,
   BrowserRunInput,
   BrowserRunResult,
   ChatMessage,
   ChatMessageInput,
-  HealthStatus
+  DeviceReviewInput,
+  HealthStatus,
+  ListVisitorDevicesParams,
+  OwnerAccess,
+  VisitorDevicePage
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -54,6 +60,648 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGetActivityConsentUrl = () => {
+
+
+
+
+  return `/api/activity/consent`
+}
+
+/**
+ * @summary Read this browser's activity logging preference
+ */
+export const getActivityConsent = async ( options?: Parameters<typeof customFetch>[1]): Promise<ActivityConsent> => {
+
+  return customFetch<ActivityConsent>(getGetActivityConsentUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetActivityConsentQueryKey = () => {
+    return [
+    `/api/activity/consent`
+    ] as const;
+    }
+
+
+export const getGetActivityConsentQueryOptions = <TData = Awaited<ReturnType<typeof getActivityConsent>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getActivityConsent>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetActivityConsentQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getActivityConsent>>> = ({ signal }) => getActivityConsent({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getActivityConsent>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetActivityConsentQueryResult = NonNullable<Awaited<ReturnType<typeof getActivityConsent>>>
+export type GetActivityConsentQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Read this browser's activity logging preference
+ */
+
+export function useGetActivityConsent<TData = Awaited<ReturnType<typeof getActivityConsent>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getActivityConsent>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetActivityConsentQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSetActivityConsentUrl = () => {
+
+
+
+
+  return `/api/activity/consent`
+}
+
+/**
+ * @summary Opt in or stop activity logging
+ */
+export const setActivityConsent = async (activityConsentInput: ActivityConsentInput, options?: Parameters<typeof customFetch>[1]): Promise<ActivityConsent> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ActivityConsent>(getSetActivityConsentUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(activityConsentInput)
+  }
+);}
+
+
+
+
+
+export const getSetActivityConsentMutationKey = () => ['setActivityConsent'] as const;
+
+export const getSetActivityConsentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setActivityConsent>>, TError,SetActivityConsentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setActivityConsent>>, TError,SetActivityConsentMutationVariables, TContext> => {
+
+const mutationKey = getSetActivityConsentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setActivityConsent>>, SetActivityConsentMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  setActivityConsent(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetActivityConsentMutationResult = NonNullable<Awaited<ReturnType<typeof setActivityConsent>>>
+    export type SetActivityConsentMutationBody = BodyType<ActivityConsentInput>
+    export type SetActivityConsentMutationError = ErrorType<unknown>
+    export type SetActivityConsentMutationVariables = {data: BodyType<ActivityConsentInput>}
+
+    /**
+ * @summary Opt in or stop activity logging
+ */
+export const useSetActivityConsent = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setActivityConsent>>, TError,SetActivityConsentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setActivityConsent>>,
+        TError,
+        SetActivityConsentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetActivityConsentMutationOptions(options));
+    }
+
+export const getRecordDeviceAccessUrl = () => {
+
+
+
+
+  return `/api/activity/access`
+}
+
+/**
+ * @summary Record a return visit only for a consenting browser
+ */
+export const recordDeviceAccess = async ( options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getRecordDeviceAccessUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRecordDeviceAccessMutationKey = () => ['recordDeviceAccess'] as const;
+
+export const getRecordDeviceAccessMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordDeviceAccess>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof recordDeviceAccess>>, TError,void, TContext> => {
+
+const mutationKey = getRecordDeviceAccessMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recordDeviceAccess>>, void> = () => {
+
+
+          return  recordDeviceAccess(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RecordDeviceAccessMutationResult = NonNullable<Awaited<ReturnType<typeof recordDeviceAccess>>>
+
+    export type RecordDeviceAccessMutationError = ErrorType<unknown>
+
+
+    /**
+ * @summary Record a return visit only for a consenting browser
+ */
+export const useRecordDeviceAccess = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordDeviceAccess>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof recordDeviceAccess>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getRecordDeviceAccessMutationOptions(options));
+    }
+
+export const getGetOwnerAccessUrl = () => {
+
+
+
+
+  return `/api/owner/access`
+}
+
+/**
+ * @summary Owner authorization for the current verified account
+ */
+export const getOwnerAccess = async ( options?: Parameters<typeof customFetch>[1]): Promise<OwnerAccess> => {
+
+  return customFetch<OwnerAccess>(getGetOwnerAccessUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOwnerAccessQueryKey = () => {
+    return [
+    `/api/owner/access`
+    ] as const;
+    }
+
+
+export const getGetOwnerAccessQueryOptions = <TData = Awaited<ReturnType<typeof getOwnerAccess>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOwnerAccess>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOwnerAccessQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOwnerAccess>>> = ({ signal }) => getOwnerAccess({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOwnerAccess>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOwnerAccessQueryResult = NonNullable<Awaited<ReturnType<typeof getOwnerAccess>>>
+export type GetOwnerAccessQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Owner authorization for the current verified account
+ */
+
+export function useGetOwnerAccess<TData = Awaited<ReturnType<typeof getOwnerAccess>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOwnerAccess>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOwnerAccessQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListVisitorDevicesUrl = (params?: ListVisitorDevicesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/owner/devices?${stringifiedParams}` : `/api/owner/devices`
+}
+
+/**
+ * @summary List consenting browsers, newest first
+ */
+export const listVisitorDevices = async (params?: ListVisitorDevicesParams, options?: Parameters<typeof customFetch>[1]): Promise<VisitorDevicePage> => {
+
+  return customFetch<VisitorDevicePage>(getListVisitorDevicesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListVisitorDevicesQueryKey = (params?: ListVisitorDevicesParams,) => {
+    return [
+    `/api/owner/devices`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListVisitorDevicesQueryOptions = <TData = Awaited<ReturnType<typeof listVisitorDevices>>, TError = ErrorType<void>>(params?: ListVisitorDevicesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVisitorDevices>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListVisitorDevicesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVisitorDevices>>> = ({ signal }) => listVisitorDevices(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listVisitorDevices>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListVisitorDevicesQueryResult = NonNullable<Awaited<ReturnType<typeof listVisitorDevices>>>
+export type ListVisitorDevicesQueryError = ErrorType<void>
+
+
+/**
+ * @summary List consenting browsers, newest first
+ */
+
+export function useListVisitorDevices<TData = Awaited<ReturnType<typeof listVisitorDevices>>, TError = ErrorType<void>>(
+ params?: ListVisitorDevicesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVisitorDevices>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListVisitorDevicesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getReviewVisitorDevicesUrl = () => {
+
+
+
+
+  return `/api/owner/devices/review`
+}
+
+/**
+ * @summary Mark the specified new browsers as reviewed
+ */
+export const reviewVisitorDevices = async (deviceReviewInput: DeviceReviewInput, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<void>(getReviewVisitorDevicesUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(deviceReviewInput)
+  }
+);}
+
+
+
+
+
+export const getReviewVisitorDevicesMutationKey = () => ['reviewVisitorDevices'] as const;
+
+export const getReviewVisitorDevicesMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewVisitorDevices>>, TError,ReviewVisitorDevicesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reviewVisitorDevices>>, TError,ReviewVisitorDevicesMutationVariables, TContext> => {
+
+const mutationKey = getReviewVisitorDevicesMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reviewVisitorDevices>>, ReviewVisitorDevicesMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  reviewVisitorDevices(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReviewVisitorDevicesMutationResult = NonNullable<Awaited<ReturnType<typeof reviewVisitorDevices>>>
+    export type ReviewVisitorDevicesMutationBody = BodyType<DeviceReviewInput>
+    export type ReviewVisitorDevicesMutationError = ErrorType<void>
+    export type ReviewVisitorDevicesMutationVariables = {data: BodyType<DeviceReviewInput>}
+
+    /**
+ * @summary Mark the specified new browsers as reviewed
+ */
+export const useReviewVisitorDevices = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewVisitorDevices>>, TError,ReviewVisitorDevicesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reviewVisitorDevices>>,
+        TError,
+        ReviewVisitorDevicesMutationVariables,
+        TContext
+      > => {
+      return useMutation(getReviewVisitorDevicesMutationOptions(options));
+    }
+
+export const getDownloadChatLogUrl = () => {
+
+
+
+
+  return `/api/owner/logs/chat.txt`
+}
+
+/**
+ * @summary Download timestamped consenting chat records
+ */
+export const downloadChatLog = async ( options?: Parameters<typeof customFetch>[1]): Promise<string> => {
+
+  return customFetch<string>(getDownloadChatLogUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDownloadChatLogQueryKey = () => {
+    return [
+    `/api/owner/logs/chat.txt`
+    ] as const;
+    }
+
+
+export const getDownloadChatLogQueryOptions = <TData = Awaited<ReturnType<typeof downloadChatLog>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadChatLog>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDownloadChatLogQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadChatLog>>> = ({ signal }) => downloadChatLog({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadChatLog>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type DownloadChatLogQueryResult = NonNullable<Awaited<ReturnType<typeof downloadChatLog>>>
+export type DownloadChatLogQueryError = ErrorType<void>
+
+
+/**
+ * @summary Download timestamped consenting chat records
+ */
+
+export function useDownloadChatLog<TData = Awaited<ReturnType<typeof downloadChatLog>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadChatLog>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getDownloadChatLogQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getDownloadVisitLogUrl = () => {
+
+
+
+
+  return `/api/owner/logs/visits.txt`
+}
+
+/**
+ * @summary Download timestamped consenting browsing records
+ */
+export const downloadVisitLog = async ( options?: Parameters<typeof customFetch>[1]): Promise<string> => {
+
+  return customFetch<string>(getDownloadVisitLogUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDownloadVisitLogQueryKey = () => {
+    return [
+    `/api/owner/logs/visits.txt`
+    ] as const;
+    }
+
+
+export const getDownloadVisitLogQueryOptions = <TData = Awaited<ReturnType<typeof downloadVisitLog>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadVisitLog>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDownloadVisitLogQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadVisitLog>>> = ({ signal }) => downloadVisitLog({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadVisitLog>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type DownloadVisitLogQueryResult = NonNullable<Awaited<ReturnType<typeof downloadVisitLog>>>
+export type DownloadVisitLogQueryError = ErrorType<void>
+
+
+/**
+ * @summary Download timestamped consenting browsing records
+ */
+
+export function useDownloadVisitLog<TData = Awaited<ReturnType<typeof downloadVisitLog>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadVisitLog>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getDownloadVisitLogQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getListChatMessagesUrl = () => {
 

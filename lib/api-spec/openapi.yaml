@@ -13,6 +13,129 @@ tags:
   - name: browser
     description: Public web page browser operations
 paths:
+  /activity/consent:
+    get:
+      operationId: getActivityConsent
+      tags: [activity]
+      summary: Read this browser's activity logging preference
+      responses:
+        "200":
+          description: Logging preference
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityConsent"
+    post:
+      operationId: setActivityConsent
+      tags: [activity]
+      summary: Opt in or stop activity logging
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActivityConsentInput"
+      responses:
+        "200":
+          description: Updated preference
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityConsent"
+  /activity/access:
+    post:
+      operationId: recordDeviceAccess
+      tags: [activity]
+      summary: Record a return visit only for a consenting browser
+      responses:
+        "204":
+          description: Access recorded, or browser has not opted in
+  /owner/access:
+    get:
+      operationId: getOwnerAccess
+      tags: [owner]
+      summary: Owner authorization for the current verified account
+      responses:
+        "200":
+          description: Access status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerAccess"
+  /owner/devices:
+    get:
+      operationId: listVisitorDevices
+      tags: [owner]
+      summary: List consenting browsers, newest first
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000000
+            default: 1
+      responses:
+        "200":
+          description: Paginated devices and unreviewed-device count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VisitorDevicePage"
+        "401":
+          description: Sign-in required
+        "403":
+          description: Verified owner account required
+  /owner/devices/review:
+    post:
+      operationId: reviewVisitorDevices
+      tags: [owner]
+      summary: Mark the specified new browsers as reviewed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceReviewInput"
+      responses:
+        "204":
+          description: Devices marked reviewed
+        "401":
+          description: Sign-in required
+        "403":
+          description: Verified owner account required
+  /owner/logs/chat.txt:
+    get:
+      operationId: downloadChatLog
+      tags: [owner]
+      summary: Download timestamped consenting chat records
+      responses:
+        "200":
+          description: UTF-8 chat log
+          content:
+            text/plain:
+              schema:
+                type: string
+        "401":
+          description: Sign-in required
+        "403":
+          description: Verified owner account required
+  /owner/logs/visits.txt:
+    get:
+      operationId: downloadVisitLog
+      tags: [owner]
+      summary: Download timestamped consenting browsing records
+      responses:
+        "200":
+          description: UTF-8 visited-address log, without query strings or fragments
+          content:
+            text/plain:
+              schema:
+                type: string
+        "401":
+          description: Sign-in required
+        "403":
+          description: Verified owner account required
   /chat:
     get:
       operationId: listChatMessages
@@ -100,6 +223,81 @@ paths:
                 $ref: "#/components/schemas/BrowserError"
 components:
   schemas:
+    ActivityConsentInput:
+      type: object
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
+    ActivityConsent:
+      type: object
+      required: [decided, enabled, deviceId, token]
+      properties:
+        decided:
+          type: boolean
+        enabled:
+          type: boolean
+        deviceId:
+          type: [string, "null"]
+        token:
+          type: [string, "null"]
+    OwnerAccess:
+      type: object
+      required: [signedIn, owner]
+      properties:
+        signedIn:
+          type: boolean
+        owner:
+          type: boolean
+    DeviceReviewInput:
+      type: object
+      required: [deviceIds]
+      properties:
+        deviceIds:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            type: string
+            format: uuid
+    VisitorDevice:
+      type: object
+      required: [deviceId, firstSeen, lastSeen, browser, platform, username, isNew, consentActive]
+      properties:
+        deviceId:
+          type: string
+        firstSeen:
+          type: string
+          format: date-time
+        lastSeen:
+          type: string
+          format: date-time
+        browser:
+          type: string
+        platform:
+          type: string
+        username:
+          type: [string, "null"]
+        isNew:
+          type: boolean
+        consentActive:
+          type: boolean
+    VisitorDevicePage:
+      type: object
+      required: [devices, total, newCount, page, pageSize]
+      properties:
+        devices:
+          type: array
+          items:
+            $ref: "#/components/schemas/VisitorDevice"
+        total:
+          type: integer
+        newCount:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
     ChatMessageInput:
       type: object
       additionalProperties: false

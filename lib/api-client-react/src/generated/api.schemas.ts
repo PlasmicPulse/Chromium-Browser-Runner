@@ -5,6 +5,52 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface ActivityConsentInput {
+  enabled: boolean;
+}
+
+export interface ActivityConsent {
+  decided: boolean;
+  enabled: boolean;
+  /** @nullable */
+  deviceId: string | null;
+  /** @nullable */
+  token: string | null;
+}
+
+export interface OwnerAccess {
+  signedIn: boolean;
+  owner: boolean;
+}
+
+export interface DeviceReviewInput {
+  /**
+     * @minItems 1
+     * @maxItems 50
+     */
+  deviceIds: string[];
+}
+
+export interface VisitorDevice {
+  deviceId: string;
+  firstSeen: string;
+  lastSeen: string;
+  browser: string;
+  platform: string;
+  /** @nullable */
+  username: string | null;
+  isNew: boolean;
+  consentActive: boolean;
+}
+
+export interface VisitorDevicePage {
+  devices: VisitorDevice[];
+  total: number;
+  newCount: number;
+  page: number;
+  pageSize: number;
+}
+
 export interface ChatMessageInput {
   /**
      * @minLength 1
@@ -52,4 +98,12 @@ export interface BrowserRunResult {
 export interface BrowserError {
   error: string;
 }
+
+export type ListVisitorDevicesParams = {
+/**
+ * @minimum 1
+ * @maximum 1000000
+ */
+page?: number;
+};
 

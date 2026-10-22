@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getListChatMessagesQueryKey, listChatMessages, sendChatMessage, type ChatMessage, type ChatMessageInput } from '@workspace/api-client-react';
 import { MessageCircle, Send } from 'lucide-react';
+import { useActivityConsent } from '@/lib/activity-consent';
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 const USERNAME_KEY = 'chromium-runner-chat-username';
@@ -16,6 +17,7 @@ export function SiteChat() {
       <DialogContent className="site-chat" onKeyDown={event => event.stopPropagation()}>
         <DialogTitle>Community chat</DialogTitle>
         <DialogDescription>Shared with everyone using this website. Latest 50 messages. Names are not verified—don’t share private information.</DialogDescription>
+        <ChatDisclosure />
         {open && <ChatRoom />}
       </DialogContent>
     </Dialog>
@@ -93,5 +95,17 @@ function ChatRoom() {
         <footer><span>{message.length}/1000 · Updates every 2 seconds</span><button type="submit" disabled={send.isPending || !message.trim() || !username.trim()}><Send size={14} />{send.isPending ? 'Sending…' : 'Send'}</button></footer>
       </form>
     </>
+  );
+}
+
+function ChatDisclosure() {
+  const { consent } = useActivityConsent();
+  const on = !!consent?.enabled;
+  return (
+    <p className="chat-disclosure" data-testid="text-chat-disclosure">
+      {on
+        ? 'Activity logging is on: the owner can see your messages, username and times linked to this browser\'s random ID. Messages are public either way.'
+        : 'Activity logging is off: your messages are not linked to this browser. Messages are still public to everyone here.'}
+    </p>
   );
 }

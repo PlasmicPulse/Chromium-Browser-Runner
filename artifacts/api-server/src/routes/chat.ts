@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { ListChatMessagesResponse, SendChatMessageBody, SendChatMessageResponse } from "@workspace/api-zod";
 import { listMessages, saveMessage } from "../lib/chat-store";
+import { deviceIdFromToken, requestDeviceToken } from "../lib/visitor-activity";
 
 const router: IRouter = Router();
 const recent = new Map<string, number>();
@@ -22,14 +23,16 @@ router.post("/chat", async (req, res): Promise<void> => {
   }
   const now = Date.now();
   for (const [key, time] of recent) if (now - time >= 2000) recent.delete(key);
-  const sender = req.ip ?? "unknown";
+  const trackingToken = requestDeviceToken(req);
+  // The service sits behind a shared proxy: using only req.ip throttles unrelated visitors together.
+  const sender = deviceIdFromToken(trackingToken) ?? `${req.ip ?? "unknown"}:${parsed.data.username.toLowerCase()}`;
   if (recent.has(sender) || recent.size >= 5000) {
     res.setHeader("Retry-After", "2");
     res.status(429).json({ error: "Please wait two seconds before sending again." });
     return;
   }
   recent.set(sender, now);
-  res.status(201).json(SendChatMessageResponse.parse(await saveMessage(parsed.data.username, parsed.data.message)));
+  res.status(201).json(SendChatMessageResponse.parse(await saveMessage(parsed.data.username, parsed.data.message, trackingToken)));
 });
 
 export default router;

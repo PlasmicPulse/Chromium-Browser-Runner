@@ -3,6 +3,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { attachBrowserWebSocket } from "./lib/browser-session";
 import { initializeChat } from "./lib/chat-store";
+import { initializeActivity } from "./lib/visitor-activity";
 
 const rawPort = process.env["PORT"];
 
@@ -24,11 +25,11 @@ server.on("error", (err) => {
   logger.error({ err }, "Error listening on port");
   process.exit(1);
 });
-initializeChat().then(() => {
+initializeChat().then(initializeActivity).then(() => {
   server.listen(port, () => {
     logger.info({ port }, "Server listening");
   });
 }).catch((err) => {
-  logger.error({ err }, "Chat database setup failed");
+  logger.error({ err }, "Application database setup failed");
   process.exit(1);
 });

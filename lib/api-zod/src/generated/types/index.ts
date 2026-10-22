@@ -6,9 +6,16 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './activityConsent';
+export * from './activityConsentInput';
 export * from './browserError';
 export * from './browserRunInput';
 export * from './browserRunResult';
 export * from './chatMessage';
 export * from './chatMessageInput';
+export * from './deviceReviewInput';
 export * from './healthStatus';
+export * from './listVisitorDevicesParams';
+export * from './ownerAccess';
+export * from './visitorDevice';
+export * from './visitorDevicePage';

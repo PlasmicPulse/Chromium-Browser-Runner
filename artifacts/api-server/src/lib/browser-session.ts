@@ -17,6 +17,7 @@ import {
   startSafeProxy,
 } from "../routes/browser";
 import { acquireBrowserSlot, releaseBrowserSlot } from "./browser-limits";
+import { deviceIdFromToken, recordVisit } from "./visitor-activity";
 import { logger } from "./logger";
 import { fitPageWidth } from "./page-layout";
 
@@ -49,6 +50,7 @@ const allowedKeys = new Set([
 ]);
 
 type BrowserMessage =
+  | { type: "tracking"; token: string | null }
   | { type: "open"; url: string; profileToken: string }
   | { type: "navigate"; url: string }
   | { type: "clearProfile"; profileToken: string }
@@ -76,6 +78,7 @@ type SafeProxy = Awaited<ReturnType<typeof startSafeProxy>>;
 
 type BrowserSession = {
   socket: WebSocket;
+  trackingToken: string | null;
   browser: Browser | null;
   context: BrowserContext | null;
   page: Page | null;
@@ -290,6 +293,10 @@ function parseMessage(raw: string): BrowserMessage | null {
   }
   if (!value || typeof value !== "object") return null;
   const message = value as Record<string, unknown>;
+  if (message.type === "tracking") {
+    return message.token === null || (typeof message.token === "string" && message.token.length <= 128)
+      ? { type: "tracking", token: message.token as string | null } : null;
+  }
   if (message.type === "fitWidth") {
     return typeof message.enabled === "boolean"
       ? { type: "fitWidth", enabled: message.enabled } : null;
@@ -438,6 +445,10 @@ function watchPage(session: BrowserSession, page: Page): void {
   page.on("framenavigated", (frame) => {
     if (frame === page.mainFrame() && /^https?:/i.test(frame.url())) {
       sendStatus(session, "loading");
+      // Never await activity writes in the ordered input/render pipeline.
+      void recordVisit(session.trackingToken, frame.url()).catch((err) => {
+        logger.warn({ err }, "Consented page activity could not be saved");
+      });
     }
   });
   page.on("load", () => {
@@ -532,6 +543,16 @@ async function handleMessage(
   message: BrowserMessage,
 ): Promise<void> {
   session.lastActivity = Date.now();
+  if (message.type === "tracking") {
+    const previous = session.trackingToken;
+    session.trackingToken = deviceIdFromToken(message.token) ? message.token : null;
+    if (session.trackingToken && session.trackingToken !== previous && session.page) {
+      void recordVisit(session.trackingToken, session.page.url()).catch((err) => {
+        logger.warn({ err }, "Consented page activity could not be saved");
+      });
+    }
+    return;
+  }
   if (message.type === "clearProfile") {
     try {
       await clearProfile(session, message.profileToken);
@@ -690,6 +711,7 @@ export function attachBrowserWebSocket(server: Server): void {
 
     const session: BrowserSession = {
       socket,
+      trackingToken: null,
       browser: null,
       context: null,
       page: null,

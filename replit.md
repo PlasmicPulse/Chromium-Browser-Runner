@@ -22,6 +22,7 @@ Open public websites in server-side Chromium, interact with a live browser strea
 - pnpm workspaces, Node.js 24, TypeScript 5.9
 - API: Express 5
 - DB: PostgreSQL + Drizzle ORM
+- Owner authentication: Replit-managed Clerk, with server-side verified-email authorization
 - Validation: Zod (`zod/v4`), `drizzle-zod`
 - API codegen: Orval (from OpenAPI spec)
 - Frontend: React + Vite
@@ -32,7 +33,7 @@ Open public websites in server-side Chromium, interact with a live browser strea
 
 - `artifacts/chromium-runner/` — frontend and browser controls.
 - `artifacts/api-server/` — Express API, live WebSocket sessions, and Chromium network safeguards.
-- `lib/db/src/schema/` — saved browser-profile schema.
+- `lib/db/src/schema/` — saved browser profiles, community chat, and consenting visitor activity.
 - `lib/api-spec/` — OpenAPI contract; generated clients and validation live in `lib/api-client-react/` and `lib/api-zod/`.
 
 ## Architecture decisions
@@ -42,6 +43,18 @@ Keep the imported workspace structure and stack. Development traffic goes throug
 ## Product
 
 The browser supports website navigation, pointer and keyboard input, back/forward, reload, and encrypted saved cookies/site data. Private and reserved destinations are blocked. At most two remote browser sessions run concurrently; idle sessions expire after ten minutes.
+
+## Owner activity and privacy
+
+- The public browser and shared chat do not require sign-in or activity-logging consent.
+- `/owner` requires Clerk sign-in using a verified address matching the shared `OWNER_EMAIL` environment variable. Do not hardcode an email or grant the first signup owner access. Development and production have separate Clerk accounts; use the configured address in each environment.
+- Clerk credentials are provisioned automatically. Keep the canonical `/api/__clerk` proxy mounted before body parsing and forward `VITE_CLERK_PROXY_URL` unchanged; development intentionally has no proxy URL.
+- Visitors must explicitly opt in before an activity ID is issued. The identifier is a random, signed browser-profile UUID, not an IP address, MAC address, fingerprint, or proven person/physical device. Clearing cookies or switching browsers creates a new identity.
+- Consenting chat messages are linked by ID; consented main-frame page navigations record origin/path, never credentials, query strings or fragments. No keystrokes are logged.
+- Stopping logging revokes the identifier server-side, including on existing remote sessions, and prevents future activity attribution. Previously recorded entries remain. Chats are still public whether or not activity logging is enabled.
+- Chat and browsing records are stored durably in the database. Protected `/api/owner/logs/chat.txt` and `/api/owner/logs/visits.txt` stream timestamped UTF-8 downloads on demand; deployment-local files are not used as durable storage or synced into the project workspace.
+- `/owner` polls for newly opted-in browser profiles every ten seconds while open. Review state is persistent; notifications are in-app, not email/push alerts.
+- API startup performs additive, idempotent chat/activity table setup in each environment. Schema definitions remain in `lib/db`.
 
 ## User preferences
 
