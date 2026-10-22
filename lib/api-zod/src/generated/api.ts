@@ -9,6 +9,42 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Latest 50 shared messages, oldest first
+ */
+export const ListChatMessagesResponseItem = zod.object({
+  "id": zod.number().int(),
+  "username": zod.string(),
+  "message": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+export const ListChatMessagesResponse = zod.array(ListChatMessagesResponseItem)
+
+
+/**
+ * @summary Send a message to the shared chat
+ */
+export const sendChatMessageBodyUsernameMax = 24;
+
+
+export const sendChatMessageBodyUsernameRegExp = new RegExp('^[a-zA-Z0-9_-]+$');
+export const sendChatMessageBodyMessageMax = 1000;
+
+
+
+export const SendChatMessageBody = zod.object({
+  "username": zod.string().min(1).max(sendChatMessageBodyUsernameMax).regex(sendChatMessageBodyUsernameRegExp),
+  "message": zod.string().min(1).max(sendChatMessageBodyMessageMax)
+})
+
+export const SendChatMessageResponse = zod.object({
+  "id": zod.number().int(),
+  "username": zod.string(),
+  "message": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
  * Returns server health status
  * @summary Health check
  */

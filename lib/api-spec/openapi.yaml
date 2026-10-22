@@ -13,6 +13,41 @@ tags:
   - name: browser
     description: Public web page browser operations
 paths:
+  /chat:
+    get:
+      operationId: listChatMessages
+      tags: [chat]
+      summary: Latest 50 shared messages, oldest first
+      responses:
+        "200":
+          description: Chat history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatMessage"
+    post:
+      operationId: sendChatMessage
+      tags: [chat]
+      summary: Send a message to the shared chat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatMessageInput"
+      responses:
+        "201":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessage"
+        "400":
+          description: Invalid username or message
+        "429":
+          description: Please wait before sending again
   /healthz:
     get:
       operationId: healthCheck
@@ -65,6 +100,33 @@ paths:
                 $ref: "#/components/schemas/BrowserError"
 components:
   schemas:
+    ChatMessageInput:
+      type: object
+      additionalProperties: false
+      required: [username, message]
+      properties:
+        username:
+          type: string
+          minLength: 1
+          maxLength: 24
+          pattern: '^[a-zA-Z0-9_-]+$'
+        message:
+          type: string
+          minLength: 1
+          maxLength: 1000
+    ChatMessage:
+      type: object
+      required: [id, username, message, createdAt]
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        message:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
     HealthStatus:
       type: object
       properties:

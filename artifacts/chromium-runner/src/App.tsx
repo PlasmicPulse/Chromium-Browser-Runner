@@ -6,9 +6,10 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import { useRemoteScroll } from '@/hooks/use-remote-scroll';
 import { remotePoint } from '@/lib/remote-point';
+import { SiteChat } from '@/components/site-chat';
 import {
   AlertCircle, ArrowLeft, ArrowRight, ExternalLink, Globe2, LoaderCircle,
-  LockKeyhole, Radio, RotateCw, ShieldCheck, Trash2, X, Maximize2, Minimize2, Scaling,
+  LockKeyhole, Radio, RotateCw, ShieldCheck, Trash2, X, Maximize2, Minimize2,
 } from 'lucide-react';
 import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 
@@ -308,7 +309,7 @@ function Home() {
               {address && <button type="button" className="clear-address" aria-label="Clear address" data-testid="button-clear-url" onClick={() => { setAddress(''); setAddressError(''); }}><X size={14} /></button>}
               <button className="go-button" type="submit" aria-label="Navigate" data-testid="button-navigate"><ArrowRight size={16} /></button>
             </form>
-            <button type="button" className="icon-button" aria-label="Fit page width" title="Fit page width (keep vertical scrolling)" aria-pressed={frame?.fitToWidth ?? true} disabled={!frame} onClick={() => send({ type: 'fitWidth', enabled: !frame?.fitToWidth })} data-testid="button-fit-width"><Scaling size={17} /></button>
+            <SiteChat />
             <button type="button" className="icon-button" aria-label="Maximize display" title="Maximize display" onClick={() => setMaximized(true)} data-testid="button-maximize"><Maximize2 size={17} /></button>
             <button
               type="button"

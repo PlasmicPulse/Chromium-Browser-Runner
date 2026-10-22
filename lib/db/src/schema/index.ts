@@ -18,3 +18,4 @@
 //   export type Post = typeof postsTable.$inferSelect;
 
 export * from "./browser-profiles";
+export * from "./chat-messages";

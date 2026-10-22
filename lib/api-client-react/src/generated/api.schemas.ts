@@ -5,6 +5,27 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface ChatMessageInput {
+  /**
+     * @minLength 1
+     * @maxLength 24
+     * @pattern ^[a-zA-Z0-9_-]+$
+     */
+  username: string;
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  message: string;
+}
+
+export interface ChatMessage {
+  id: number;
+  username: string;
+  message: string;
+  createdAt: string;
+}
+
 export interface HealthStatus {
   status: string;
 }

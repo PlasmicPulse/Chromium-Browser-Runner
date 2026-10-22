@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { attachBrowserWebSocket } from "./lib/browser-session";
+import { initializeChat } from "./lib/chat-store";
 
 const rawPort = process.env["PORT"];
 
@@ -23,6 +24,11 @@ server.on("error", (err) => {
   logger.error({ err }, "Error listening on port");
   process.exit(1);
 });
-server.listen(port, () => {
-  logger.info({ port }, "Server listening");
+initializeChat().then(() => {
+  server.listen(port, () => {
+    logger.info({ port }, "Server listening");
+  });
+}).catch((err) => {
+  logger.error({ err }, "Chat database setup failed");
+  process.exit(1);
 });

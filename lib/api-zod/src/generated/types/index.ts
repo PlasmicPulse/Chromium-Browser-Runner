@@ -9,4 +9,6 @@
 export * from './browserError';
 export * from './browserRunInput';
 export * from './browserRunResult';
+export * from './chatMessage';
+export * from './chatMessageInput';
 export * from './healthStatus';

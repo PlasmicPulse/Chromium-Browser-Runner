@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
 import browserRouter from "./browser";
+import chatRouter from "./chat";
 
 const router: IRouter = Router();
 
@@ -15,5 +16,6 @@ router.get("/api", (_req, res) => {
 
 router.use(healthRouter);
 router.use(browserRouter);
+router.use(chatRouter);
 
 export default router;
