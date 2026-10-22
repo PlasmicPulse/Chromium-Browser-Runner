@@ -51,6 +51,7 @@ The import setup request is to get the existing app running on Replit, without r
 
 - The API dev command cleans and rebuilds its output before starting. Do not run a standalone API build concurrently with its workflow startup.
 - Playwright downloads Chromium on the first API build. Its Linux libraries are declared in `.replit`.
+- Keep `PLAYWRIGHT_BROWSERS_PATH=0` consistent in API build and runtime commands. This installs Chromium alongside Playwright inside `node_modules`, rather than the `.cache` directory omitted from published apps.
 - Both `/api` and `/api/browser/ws` must remain routed to the API service.
 
 ## Pointers

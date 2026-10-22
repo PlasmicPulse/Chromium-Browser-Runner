@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",
-    "build": "pnpm exec playwright install chromium && node ./build.mjs",
-    "start": "node --enable-source-maps ./dist/index.mjs",
+    "build": "PLAYWRIGHT_BROWSERS_PATH=0 pnpm exec playwright install chromium && node ./build.mjs",
+    "start": "PLAYWRIGHT_BROWSERS_PATH=0 node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

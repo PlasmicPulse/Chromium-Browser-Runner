@@ -76,7 +76,6 @@ export async function resolvePublicIPv4(hostname: string): Promise<string> {
 }
 
 export function getAllowedWebUrl(rawUrl: string): URL {
-  console.log("DEBUG - Received rawUrl:", rawUrl);
   const url = new URL(rawUrl);
   if (
     !["http:", "https:"].includes(url.protocol) ||

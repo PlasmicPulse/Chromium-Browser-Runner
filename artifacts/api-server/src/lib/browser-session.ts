@@ -17,6 +17,7 @@ import {
   startSafeProxy,
 } from "../routes/browser";
 import { acquireBrowserSlot, releaseBrowserSlot } from "./browser-limits";
+import { logger } from "./logger";
 
 const WIDTH = 1280;
 const HEIGHT = 800;
@@ -524,11 +525,12 @@ async function handleMessage(
         message.url,
         message.type === "open" ? message.profileToken : undefined,
       );
-    } catch {
+    } catch (err) {
+      logger.warn({ err }, "Remote browser could not open page");
       sendStatus(session, "ready");
       sendError(
         session,
-        "Could not open that page. Use a public HTTP or HTTPS website; local and private destinations are blocked.",
+        "Could not start the remote browser or load that page. Check the address and try again. If this continues, check the server logs.",
       );
     }
     return;

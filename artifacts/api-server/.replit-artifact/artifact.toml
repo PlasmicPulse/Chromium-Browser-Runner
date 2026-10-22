@@ -25,6 +25,7 @@ NODE_ENV = "production"
 args = ["node", "--enable-source-maps", "artifacts/api-server/dist/index.mjs"]
 
 [services.production.run.env]
+PLAYWRIGHT_BROWSERS_PATH = "0"
 PORT = "8080"
 NODE_ENV = "production"
 
