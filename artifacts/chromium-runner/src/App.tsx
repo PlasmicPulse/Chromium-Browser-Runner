@@ -349,7 +349,7 @@ function Home() {
               onPointerDown={(event) => pointer(event, 'down')}
               onPointerMove={(event) => {
                 const now = performance.now();
-                if (now - lastPointerMoveRef.current >= 50) {
+                if (now - lastPointerMoveRef.current >= 16) {
                   lastPointerMoveRef.current = now;
                   pointer(event, 'move');
                 }

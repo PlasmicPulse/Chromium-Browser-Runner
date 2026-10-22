@@ -209,7 +209,7 @@
   overflow: hidden; background-color: #e9e9e1; background-image: radial-gradient(#d5d7ce .7px, transparent .7px); background-size: 17px 17px;
   outline: none; touch-action: none;
 }
-.remote-viewport.has-frame { cursor: crosshair; }
+.remote-viewport.has-frame { cursor: auto; }
 .remote-viewport.has-frame { min-height: 0; }
 .remote-frame { display: block; width: 100%; height: 100%; object-fit: fill; user-select: none; -webkit-user-drag: none; }
 .viewport-empty { display: flex; align-items: center; flex-direction: column; max-width: 470px; padding: 28px; text-align: center; animation: arrive .4s ease-out both; }

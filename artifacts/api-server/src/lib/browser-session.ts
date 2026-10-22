@@ -21,7 +21,8 @@ import { logger } from "./logger";
 
 const WIDTH = 1280;
 const HEIGHT = 800;
-const FRAME_INTERVAL_MS = 750;
+const FRAME_INTERVAL_MS = 100;
+const MAX_FRAME_BACKLOG_BYTES = 256 * 1024;
 const PROFILE_SAVE_DEBOUNCE_MS = 1_200;
 const PROFILE_SAVE_INTERVAL_MS = 10_000;
 const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
@@ -88,6 +89,7 @@ type BrowserSession = {
   capturingFrame: boolean;
   closed: boolean;
   queue: Promise<void>;
+  pendingInput: BrowserMessage | null;
   initializePromise: Promise<void> | null;
   cleanupPromise: Promise<void> | null;
   observedPages: WeakSet<Page>;
@@ -357,7 +359,8 @@ async function captureFrame(session: BrowserSession): Promise<void> {
     session.capturingFrame ||
     !session.page ||
     session.page.isClosed() ||
-    session.socket.readyState !== WebSocket.OPEN
+    session.socket.readyState !== WebSocket.OPEN ||
+    session.socket.bufferedAmount > MAX_FRAME_BACKLOG_BYTES
   ) {
     return;
   }
@@ -368,7 +371,6 @@ async function captureFrame(session: BrowserSession): Promise<void> {
       session.page.screenshot({
         type: "jpeg",
         quality: 62,
-        animations: "disabled",
         timeout: 4_000,
       }),
       session.page.title().catch(() => ""),
@@ -590,7 +592,8 @@ async function handleMessage(
     }
     if (message.type !== "pointer" || message.phase !== "move") {
       scheduleProfileSave(session);
-      await captureFrame(session);
+      // A slow screenshot must not hold up subsequent input events.
+      void captureFrame(session);
     }
   } catch {
     sendError(session, "That browser action could not be completed.");
@@ -668,6 +671,7 @@ export function attachBrowserWebSocket(server: Server): void {
       capturingFrame: false,
       closed: false,
       queue: Promise.resolve(),
+      pendingInput: null,
       initializePromise: null,
       cleanupPromise: null,
       observedPages: new WeakSet(),
@@ -694,8 +698,32 @@ export function attachBrowserWebSocket(server: Server): void {
         sendError(session, "The browser received an unsupported action.");
         return;
       }
+      // Merge only adjacent queued events: never move input across a click,
+      // navigation, or key event, and never change an event already executing.
+      const pending = session.pendingInput;
+      if (pending?.type === "pointer" && pending.phase === "move" &&
+          message.type === "pointer" && message.phase === "move") {
+        Object.assign(pending, message);
+        return;
+      }
+      if (pending?.type === "scroll" && message.type === "scroll") {
+        pending.x = message.x;
+        pending.y = message.y;
+        pending.deltaX = Math.max(-1800, Math.min(1800, pending.deltaX + message.deltaX));
+        pending.deltaY = Math.max(-1800, Math.min(1800, pending.deltaY + message.deltaY));
+        return;
+      }
+      if (pending?.type === "text" && message.type === "text" &&
+          pending.text.length + message.text.length <= 2500) {
+        pending.text += message.text;
+        return;
+      }
+      session.pendingInput = message;
       session.queue = session.queue
-        .then(() => handleMessage(session, message))
+        .then(() => {
+          if (session.pendingInput === message) session.pendingInput = null;
+          return session.closed ? undefined : handleMessage(session, message);
+        })
         .catch(() => sendError(session, "The browser action failed."));
       if (
         message.type === "open" &&
