@@ -18,6 +18,7 @@ import {
 } from "../routes/browser";
 import { acquireBrowserSlot, releaseBrowserSlot } from "./browser-limits";
 import { logger } from "./logger";
+import { fitPageWidth } from "./page-layout";
 
 const WIDTH = 1280;
 const HEIGHT = 800;
@@ -52,6 +53,8 @@ type BrowserMessage =
   | { type: "navigate"; url: string }
   | { type: "clearProfile"; profileToken: string }
   | { type: "back" | "forward" | "reload" }
+  | { type: "fitWidth"; enabled: boolean }
+  | { type: "scrollTo"; ratio: number }
   | {
       type: "pointer";
       phase: "down" | "move" | "up";
@@ -93,6 +96,7 @@ type BrowserSession = {
   initializePromise: Promise<void> | null;
   cleanupPromise: Promise<void> | null;
   observedPages: WeakSet<Page>;
+  fitToWidth: boolean;
 };
 
 type SavedStorageState = Awaited<ReturnType<BrowserContext["storageState"]>>;
@@ -286,6 +290,14 @@ function parseMessage(raw: string): BrowserMessage | null {
   }
   if (!value || typeof value !== "object") return null;
   const message = value as Record<string, unknown>;
+  if (message.type === "fitWidth") {
+    return typeof message.enabled === "boolean"
+      ? { type: "fitWidth", enabled: message.enabled } : null;
+  }
+  if (message.type === "scrollTo") {
+    return validUnitCoordinate(message.ratio)
+      ? { type: "scrollTo", ratio: message.ratio } : null;
+  }
   if (message.type === "open") {
     return typeof message.url === "string" &&
       message.url.length <= 2048 &&
@@ -367,13 +379,18 @@ async function captureFrame(session: BrowserSession): Promise<void> {
 
   session.capturingFrame = true;
   try {
-    const [image, title] = await Promise.all([
+    const [image, title, scroll] = await Promise.all([
       session.page.screenshot({
         type: "jpeg",
         quality: 62,
         timeout: 4_000,
       }),
       session.page.title().catch(() => ""),
+      session.page.evaluate(() => {
+        const element = document.scrollingElement ?? document.documentElement;
+        const max = Math.max(0, element.scrollHeight - element.clientHeight);
+        return { ratio: max ? element.scrollTop / max : 0, canScroll: max > 1 };
+      }),
     ]);
     send(session, {
       type: "frame",
@@ -382,6 +399,8 @@ async function captureFrame(session: BrowserSession): Promise<void> {
       title,
       status: session.responseStatus,
       viewport: { width: WIDTH, height: HEIGHT },
+      scroll,
+      fitToWidth: session.fitToWidth,
     });
   } catch {
     // The page may be navigating or closing; the next frame will recover.
@@ -425,7 +444,8 @@ function watchPage(session: BrowserSession, page: Page): void {
     if (session.page === page) {
       sendStatus(session, "ready");
       scheduleProfileSave(session);
-      void captureFrame(session);
+      void fitPageWidth(page, session.fitToWidth, WIDTH)
+        .then(() => captureFrame(session)).catch(() => undefined);
     }
   });
   page.on("download", (download) => {
@@ -478,6 +498,7 @@ async function startSession(
     timeout: 20_000,
   });
   session.responseStatus = response?.status() ?? session.responseStatus;
+  await fitPageWidth(session.page, session.fitToWidth, WIDTH);
   sendStatus(session, "ready");
   await captureFrame(session);
 }
@@ -546,6 +567,20 @@ async function handleMessage(
 
   try {
     switch (message.type) {
+      case "fitWidth":
+        session.fitToWidth = message.enabled;
+        await fitPageWidth(page, message.enabled, WIDTH);
+        break;
+      case "scrollTo":
+        await page.evaluate((ratio) => {
+          const element = document.scrollingElement ?? document.documentElement;
+          element.scrollTo({
+            top: ratio * Math.max(0, element.scrollHeight - element.clientHeight),
+            left: element.scrollLeft,
+            behavior: "instant",
+          });
+        }, message.ratio);
+        break;
       case "back":
         sendStatus(session, "loading");
         await page.goBack({ waitUntil: "domcontentloaded", timeout: 12_000 }).catch(() => null);
@@ -675,6 +710,7 @@ export function attachBrowserWebSocket(server: Server): void {
       initializePromise: null,
       cleanupPromise: null,
       observedPages: new WeakSet(),
+      fitToWidth: true,
     };
 
     sendStatus(session, "starting");
@@ -701,6 +737,10 @@ export function attachBrowserWebSocket(server: Server): void {
       // Merge only adjacent queued events: never move input across a click,
       // navigation, or key event, and never change an event already executing.
       const pending = session.pendingInput;
+      if (pending?.type === "scrollTo" && message.type === "scrollTo") {
+        pending.ratio = message.ratio;
+        return;
+      }
       if (pending?.type === "pointer" && pending.phase === "move" &&
           message.type === "pointer" && message.phase === "move") {
         Object.assign(pending, message);

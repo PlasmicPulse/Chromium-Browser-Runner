@@ -211,7 +211,7 @@
 }
 .remote-viewport.has-frame { cursor: auto; }
 .remote-viewport.has-frame { min-height: 0; }
-.remote-frame { display: block; width: 100%; height: 100%; object-fit: fill; user-select: none; -webkit-user-drag: none; }
+.remote-frame { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; }
 .viewport-empty { display: flex; align-items: center; flex-direction: column; max-width: 470px; padding: 28px; text-align: center; animation: arrive .4s ease-out both; }
 .empty-icon { width: 48px; height: 48px; display: grid; place-items: center; border: 1px solid #d2d9ce; border-radius: 15px; color: #4b7b6d; background: rgba(248,248,239,.82); box-shadow: 0 5px 18px rgba(48,72,64,.06); }
 .error-icon { color: #ad5548; border-color: #e2c4b9; }
@@ -380,6 +380,49 @@ html, body, #root { width: 100%; height: 100%; overflow: hidden; }
 }
 .remote-viewport.has-frame { min-height: 0; }
 .viewport-foot { flex: none; }
+.remote-viewport { min-width: 0; touch-action: none; }
+.remote-frame { pointer-events: none; }
+.icon-button[aria-pressed="true"] { background: #dfe9e2; color: #315e51; }
+.page-scrollbar {
+  position: absolute;
+  z-index: 3;
+  right: 4px;
+  top: 52px;
+  width: 18px;
+  height: calc(100% - 64px);
+  margin: 0;
+  writing-mode: vertical-lr;
+  direction: ltr;
+  accent-color: #426e60;
+  cursor: ns-resize;
+  touch-action: none;
+}
+.browser-chrome.is-maximized { padding: 0; }
+.is-maximized > .toolbar,
+.is-maximized .viewport-toolbar,
+.is-maximized .viewport-foot { display: none; }
+.is-maximized .viewport-frame { border: 0; border-radius: 0; }
+.restore-display {
+  position: absolute;
+  z-index: 4;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid #c3d0c7;
+  border-radius: 7px;
+  color: #315e51;
+  background: #f1f5f0ee;
+  box-shadow: 0 2px 8px #0002;
+  font: 12px var(--app-font-sans, sans-serif);
+  cursor: pointer;
+}
+.restore-display:focus-visible, .page-scrollbar:focus-visible {
+  outline: 2px solid #315e51;
+  outline-offset: 3px;
+}
 .viewport-empty { max-width: 430px; }
 .empty-kicker, .loading-track { display: none; }
 .viewport-empty h2 { font-size: 16px; font-weight: 600; }

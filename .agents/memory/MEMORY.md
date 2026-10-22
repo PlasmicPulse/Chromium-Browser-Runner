@@ -1,3 +1,4 @@
 - [API build ordering](api-build-ordering.md) — The API dev workflow cleans and rebuilds its output at startup; never overlap it with a standalone build.
 - [Playwright deployment packaging](playwright-deployment.md) — Chromium must be installed and launched from a deployment-included path, not the excluded workspace cache.
 - [Remote browser responsiveness](remote-input-latency.md) — Screenshot capture must not block ordered input; drop stale visual work rather than accumulating latency.
+- [Browser display requirements](display-requirements.md) — Fit width with scrolling, in-page maximization rather than native fullscreen, and a normal mouse cursor.

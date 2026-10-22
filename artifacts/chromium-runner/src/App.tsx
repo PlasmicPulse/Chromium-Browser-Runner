@@ -1,12 +1,14 @@
-import { type ClipboardEvent as ReactClipboardEvent, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type WheelEvent, useEffect, useRef, useState } from 'react';
+import { type ClipboardEvent as ReactClipboardEvent, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
+import { useRemoteScroll } from '@/hooks/use-remote-scroll';
+import { remotePoint } from '@/lib/remote-point';
 import {
   AlertCircle, ArrowLeft, ArrowRight, ExternalLink, Globe2, LoaderCircle,
-  LockKeyhole, Radio, RotateCw, ShieldCheck, Trash2, X,
+  LockKeyhole, Radio, RotateCw, ShieldCheck, Trash2, X, Maximize2, Minimize2, Scaling,
 } from 'lucide-react';
 import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 
@@ -14,7 +16,7 @@ const queryClient = new QueryClient();
 const PROFILE_TOKEN_KEY = 'chromium-runner-profile-v1';
 type RemoteState = 'disconnected' | 'connecting' | 'starting' | 'loading' | 'ready' | 'closed' | 'error';
 type ProfileState = 'empty' | 'saving' | 'saved' | 'error';
-type BrowserFrame = { image: string; url: string; title: string; status: number; viewport: { width: number; height: number } };
+type BrowserFrame = { image: string; url: string; title: string; status: number; viewport: { width: number; height: number }; scroll?: { ratio: number; canScroll: boolean }; fitToWidth?: boolean };
 type BrowserMessage =
   | { type: 'status'; state: 'starting' | 'loading' | 'ready' | 'closed'; message?: string }
   | { type: 'profile'; state: ProfileState; message?: string }
@@ -25,6 +27,8 @@ type ClientMessage =
   | { type: 'navigate'; url: string }
   | { type: 'clearProfile'; profileToken: string }
   | { type: 'back' | 'forward' | 'reload' }
+  | { type: 'fitWidth'; enabled: boolean }
+  | { type: 'scrollTo'; ratio: number }
   | { type: 'pointer'; phase: 'down' | 'move' | 'up'; x: number; y: number; button: number }
   | { type: 'scroll'; x: number; y: number; deltaX: number; deltaY: number }
   | { type: 'text'; text: string }
@@ -48,6 +52,9 @@ function Home() {
   const [addressError, setAddressError] = useState('');
   const [notice, setNotice] = useState('');
   const [profileState, setProfileState] = useState<ProfileState>('empty');
+  const [maximized, setMaximized] = useState(false);
+  const [scrollPosition, setScrollPosition] = useState(0);
+  const scrollDraggingRef = useRef(false);
   const socketRef = useRef<WebSocket | null>(null);
   const profileTokenRef = useRef<string | null>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -60,6 +67,21 @@ function Home() {
     const socket = socketRef.current;
     if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
   }
+
+  useRemoteScroll(viewportRef, frame?.viewport ?? null, send);
+
+  useEffect(() => {
+    if (!maximized) return;
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      setMaximized(false);
+      viewportRef.current?.focus();
+    };
+    window.addEventListener('keydown', escape, true);
+    return () => window.removeEventListener('keydown', escape, true);
+  }, [maximized]);
 
   function closeSession() {
     socketRef.current?.close();
@@ -127,7 +149,8 @@ function Home() {
             setRemoteState('closed');
           }
         } else if (message.type === 'frame') {
-          setFrame({ image: message.image, url: message.url, title: message.title, status: message.status, viewport: message.viewport });
+          setFrame({ image: message.image, url: message.url, title: message.title, status: message.status, viewport: message.viewport, scroll: message.scroll, fitToWidth: message.fitToWidth });
+          if (!scrollDraggingRef.current) setScrollPosition(message.scroll?.ratio ?? 0);
           if (!addressEditingRef.current) setAddress(message.url);
           setCurrentUrl(message.url);
           setRemoteState('ready');
@@ -206,20 +229,17 @@ function Home() {
   }
 
   function normalizedPoint(event: ReactPointerEvent<HTMLDivElement>) {
-    const bounds = event.currentTarget.getBoundingClientRect();
-    return {
-      x: Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width)),
-      y: Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height)),
-    };
+    return remotePoint(event.currentTarget, event.clientX, event.clientY, frame!.viewport);
   }
 
   function pointer(event: ReactPointerEvent<HTMLDivElement>, phase: 'down' | 'move' | 'up') {
-    if (!frame) return;
+    if (!frame || event.pointerType === 'touch') return;
+    const point = normalizedPoint(event);
+    if (!point.inside && !event.currentTarget.hasPointerCapture(event.pointerId)) return;
     if (phase === 'down') {
       event.currentTarget.focus();
       event.currentTarget.setPointerCapture(event.pointerId);
     }
-    const point = normalizedPoint(event);
     const button = phase === 'move'
       ? event.buttons === 2 ? 2 : event.buttons === 4 ? 1 : 0
       : event.button;
@@ -227,19 +247,6 @@ function Home() {
     if (phase === 'up' && event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
-  }
-
-  function scroll(event: WheelEvent<HTMLDivElement>) {
-    if (!frame) return;
-    event.preventDefault();
-    const bounds = event.currentTarget.getBoundingClientRect();
-    send({
-      type: 'scroll',
-      x: Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width)),
-      y: Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height)),
-      deltaX: event.deltaX,
-      deltaY: event.deltaY,
-    });
   }
 
   function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
@@ -278,7 +285,7 @@ function Home() {
   return (
     <main className="runner-shell">
       <section className="browser-app" aria-label="Remote browser">
-        <div className="browser-chrome">
+        <div className={`browser-chrome ${maximized ? 'is-maximized' : ''}`}>
           <div className="toolbar">
             <div className="history-controls">
               <button type="button" className="icon-button" aria-label="Go back" title="Back" disabled={!connected} onClick={() => send({ type: 'back' })} data-testid="button-back"><ArrowLeft size={17} /></button>
@@ -301,6 +308,8 @@ function Home() {
               {address && <button type="button" className="clear-address" aria-label="Clear address" data-testid="button-clear-url" onClick={() => { setAddress(''); setAddressError(''); }}><X size={14} /></button>}
               <button className="go-button" type="submit" aria-label="Navigate" data-testid="button-navigate"><ArrowRight size={16} /></button>
             </form>
+            <button type="button" className="icon-button" aria-label="Fit page width" title="Fit page width (keep vertical scrolling)" aria-pressed={frame?.fitToWidth ?? true} disabled={!frame} onClick={() => send({ type: 'fitWidth', enabled: !frame?.fitToWidth })} data-testid="button-fit-width"><Scaling size={17} /></button>
+            <button type="button" className="icon-button" aria-label="Maximize display" title="Maximize display" onClick={() => setMaximized(true)} data-testid="button-maximize"><Maximize2 size={17} /></button>
             <button
               type="button"
               className="icon-button clear-profile-button"
@@ -355,11 +364,39 @@ function Home() {
                 }
               }}
               onPointerUp={(event) => pointer(event, 'up')}
-              onWheel={scroll}
               onContextMenu={(event) => event.preventDefault()}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
             >
+              {maximized && (
+                <button type="button" className="restore-display" data-local-control
+                  aria-label="Restore display" title="Restore display (Escape)" data-testid="button-restore"
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onPointerMove={(event) => event.stopPropagation()}
+                  onPointerUp={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => event.stopPropagation()}
+                  onClick={() => { setMaximized(false); viewportRef.current?.focus(); }}>
+                  <Minimize2 size={16} /><span>Restore</span>
+                </button>
+              )}
+              {frame?.scroll?.canScroll && (
+                <input type="range" min="0" max="1000" step="1"
+                  className="page-scrollbar" data-local-control data-testid="page-scrollbar"
+                  aria-label="Page vertical scroll" aria-orientation="vertical"
+                  aria-valuetext={`${Math.round(scrollPosition * 100)}% down the page`}
+                  value={Math.round(scrollPosition * 1000)}
+                  onPointerDown={(event) => { event.stopPropagation(); scrollDraggingRef.current = true; }}
+                  onPointerMove={(event) => event.stopPropagation()}
+                  onPointerUp={(event) => { event.stopPropagation(); scrollDraggingRef.current = false; }}
+                  onPointerCancel={() => { scrollDraggingRef.current = false; }}
+                  onKeyDown={(event) => event.stopPropagation()}
+                  onChange={(event) => {
+                    const ratio = Number(event.target.value) / 1000;
+                    setScrollPosition(ratio);
+                    send({ type: 'scrollTo', ratio });
+                  }}
+                />
+              )}
               {frame && (
                 <img
                   className="remote-frame"
