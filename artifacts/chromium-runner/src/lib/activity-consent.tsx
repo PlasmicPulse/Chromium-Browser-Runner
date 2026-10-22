@@ -25,10 +25,16 @@ export function ActivityConsentProvider({ children }: { children: ReactNode }) {
     queryKey: key,
     queryFn: ({ signal }) => getActivityConsent({ signal }),
     refetchOnWindowFocus: true,
+    refetchInterval: 15_000,
     staleTime: 15_000,
   });
   const mutation = useMutation({
-    mutationFn: (enabled: boolean) => setActivityConsent({ enabled }),
+    mutationFn: async (enabled: boolean) => {
+      await setActivityConsent({ enabled });
+      const confirmed = await getActivityConsent();
+      if (enabled && !confirmed.enabled) throw new Error('Enable cookies for this site, then accept activity logging to continue.');
+      return confirmed;
+    },
     onSuccess: (next) => {
       client.setQueryData(key, next);
       channelRef.current?.postMessage('changed');

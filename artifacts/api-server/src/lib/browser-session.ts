@@ -17,7 +17,7 @@ import {
   startSafeProxy,
 } from "../routes/browser";
 import { acquireBrowserSlot, releaseBrowserSlot } from "./browser-limits";
-import { deviceIdFromToken, recordVisit } from "./visitor-activity";
+import { deviceIdFromToken, deviceTokenFromCookieHeader, hasActivityAcceptance, onActivityRevoked, recordVisit } from "./visitor-activity";
 import { logger } from "./logger";
 import { fitPageWidth } from "./page-layout";
 
@@ -487,6 +487,7 @@ async function startSession(
       proxy: { server: session.proxy.origin, bypass: "" },
       args: ["--no-sandbox", "--disable-dev-shm-usage"],
     });
+    if (session.closed) throw new Error("The browser session was closed.");
     session.context = await session.browser.newContext({
       viewport: { width: WIDTH, height: HEIGHT },
       acceptDownloads: false,
@@ -544,12 +545,11 @@ async function handleMessage(
 ): Promise<void> {
   session.lastActivity = Date.now();
   if (message.type === "tracking") {
-    const previous = session.trackingToken;
-    session.trackingToken = deviceIdFromToken(message.token) ? message.token : null;
-    if (session.trackingToken && session.trackingToken !== previous && session.page) {
-      void recordVisit(session.trackingToken, session.page.url()).catch((err) => {
-        logger.warn({ err }, "Consented page activity could not be saved");
-      });
+    // Identity is bound to the accepted cookie at upgrade, never chosen by the socket client.
+    if (message.token !== session.trackingToken) {
+      session.closed = true;
+      sendError(session, "Activity logging acceptance is required to use the browser.");
+      session.socket.close(1008, "Activity logging acceptance required");
     }
     return;
   }
@@ -666,8 +666,9 @@ export function attachBrowserWebSocket(server: Server): void {
     noServer: true,
     maxPayload: 16 * 1024,
   });
+  const acceptedTokens = new WeakMap<WebSocket, string>();
 
-  server.on("upgrade", (request: MessageEventLike, socket: Duplex, head: Buffer) => {
+  server.on("upgrade", async (request: MessageEventLike, socket: Duplex, head: Buffer) => {
     let pathname = "";
     try {
       pathname = new URL(request.url ?? "/", "http://localhost").pathname;
@@ -692,9 +693,21 @@ export function attachBrowserWebSocket(server: Server): void {
       return;
     }
 
-    webSocketServer.handleUpgrade(request, socket, head, (webSocket) => {
-      webSocketServer.emit("connection", webSocket, request);
-    });
+    try {
+      const token = deviceTokenFromCookieHeader(request.headers.cookie);
+      if (!token || !await hasActivityAcceptance(token)) {
+        rejectUpgrade(socket, 403);
+        return;
+      }
+      if (socket.destroyed) return;
+      webSocketServer.handleUpgrade(request, socket, head, (webSocket) => {
+        acceptedTokens.set(webSocket, token);
+        webSocketServer.emit("connection", webSocket, request);
+      });
+    } catch (err) {
+      logger.warn({ err }, "Browser activity acceptance could not be verified");
+      rejectUpgrade(socket, 503);
+    }
   });
 
   webSocketServer.on("connection", (socket) => {
@@ -711,7 +724,7 @@ export function attachBrowserWebSocket(server: Server): void {
 
     const session: BrowserSession = {
       socket,
-      trackingToken: null,
+      trackingToken: acceptedTokens.get(socket) ?? null,
       browser: null,
       context: null,
       page: null,
@@ -734,6 +747,28 @@ export function attachBrowserWebSocket(server: Server): void {
       observedPages: new WeakSet(),
       fitToWidth: true,
     };
+
+    const stopForAcceptance = () => {
+      if (session.closed) return;
+      session.closed = true;
+      sendError(session, "Activity logging acceptance is required to use the browser.");
+      socket.close(1008, "Activity logging acceptance required");
+      // Interrupt a current navigation too; cleanup below also handles partial initialization.
+      void session.browser?.close().catch(() => undefined);
+    };
+    const removeRevocationListener = onActivityRevoked(id => {
+      if (id === deviceIdFromToken(session.trackingToken)) stopForAcceptance();
+    });
+    let checkingAcceptance = false;
+    // Check revocation from other deployed instances without adding latency to ordered input.
+    const acceptanceTimer = setInterval(() => {
+      if (session.closed || checkingAcceptance) return;
+      checkingAcceptance = true;
+      void hasActivityAcceptance(session.trackingToken)
+        .then(active => { if (!active) stopForAcceptance(); })
+        .catch(() => stopForAcceptance())
+        .finally(() => { checkingAcceptance = false; });
+    }, 1000);
 
     sendStatus(session, "starting");
     session.frameTimer = setInterval(() => {
@@ -799,6 +834,8 @@ export function attachBrowserWebSocket(server: Server): void {
     const cleanup = (): Promise<void> => {
       if (session.cleanupPromise) return session.cleanupPromise;
       session.closed = true;
+      clearInterval(acceptanceTimer);
+      removeRevocationListener();
       if (session.frameTimer) clearInterval(session.frameTimer);
       if (session.profileTimer) clearInterval(session.profileTimer);
       if (session.profileSaveTimer) {

@@ -13,9 +13,9 @@ export function ActivitySettings() {
       <DialogTrigger asChild>
         <button type="button" className={`icon-button activity-trigger ${on ? 'is-on' : ''}`} aria-label={`Activity logging settings (${on ? 'on' : 'off'})`} title="Activity logging" data-testid="button-activity-settings"><Fingerprint size={16} /></button>
       </DialogTrigger>
-      <DialogContent className="site-chat" onKeyDown={event => event.stopPropagation()}>
+      <DialogContent className="activity-settings-panel" onKeyDown={event => event.stopPropagation()}>
         <DialogTitle>Activity logging</DialogTitle>
-        <DialogDescription>Optional. Your choice applies to this browser only.</DialogDescription>
+        <DialogDescription>Acceptance is required for browser and chat access. This setting applies to this browser only.</DialogDescription>
         {isLoading ? <p className="chat-muted" role="status">Loading your preference...</p>
           : error ? <p role="alert">Could not load your preference. <button type="button" className="consent-link" onClick={refetch}>Retry</button></p>
             : (
@@ -25,14 +25,14 @@ export function ActivitySettings() {
                 </p>
                 {on && consent?.deviceId && <p className="consent-id">Browser ID <code data-testid="text-device-id">{consent.deviceId}</code></p>}
                 <ConsentDetails />
-                {on && <p className="chat-muted">Stopping prevents future records. Entries already recorded are kept.</p>}
+                {on && <p className="chat-muted">Withdrawing acceptance ends your active browser session and locks the browser and chat. Entries already recorded are kept.</p>}
                 {saveError ? <p className="consent-error" role="alert">Could not save your choice. Try again.</p> : null}
                 <div className="consent-actions">
                   {on
-                    ? <button type="button" className="consent-secondary" disabled={saving} onClick={() => setEnabled(false)} data-testid="button-consent-stop">{saving ? 'Saving...' : 'Stop activity logging'}</button>
+                    ? <button type="button" className="consent-secondary" disabled={saving} onClick={() => setEnabled(false)} data-testid="button-consent-stop">{saving ? 'Saving...' : 'Withdraw acceptance and end session'}</button>
                     : <>
                       {!consent?.decided && <button type="button" className="consent-secondary" disabled={saving} onClick={() => setEnabled(false)} data-testid="button-consent-decline-settings">Decline</button>}
-                      <button type="button" className="consent-primary" disabled={saving} onClick={() => setEnabled(true)} data-testid="button-consent-enable">{saving ? 'Saving...' : 'Allow activity logging'}</button>
+                      <button type="button" className="consent-primary" disabled={saving} onClick={() => setEnabled(true)} data-testid="button-consent-enable">{saving ? 'Saving...' : 'Accept and continue'}</button>
                     </>}
                 </div>
               </>

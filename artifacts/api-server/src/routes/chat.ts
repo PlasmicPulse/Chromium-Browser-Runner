@@ -2,16 +2,17 @@ import { Router, type IRouter } from "express";
 import { ListChatMessagesResponse, SendChatMessageBody, SendChatMessageResponse } from "@workspace/api-zod";
 import { listMessages, saveMessage } from "../lib/chat-store";
 import { deviceIdFromToken, requestDeviceToken } from "../lib/visitor-activity";
+import { requireActivityAcceptance } from "../middlewares/activity-access";
 
 const router: IRouter = Router();
 const recent = new Map<string, number>();
 
-router.get("/chat", async (_req, res): Promise<void> => {
+router.get("/chat", requireActivityAcceptance, async (_req, res): Promise<void> => {
   res.setHeader("Cache-Control", "no-store");
   res.json(ListChatMessagesResponse.parse(await listMessages()));
 });
 
-router.post("/chat", async (req, res): Promise<void> => {
+router.post("/chat", requireActivityAcceptance, async (req, res): Promise<void> => {
   const body = req.body && typeof req.body === "object" ? {
     username: typeof req.body.username === "string" ? req.body.username.trim() : req.body.username,
     message: typeof req.body.message === "string" ? req.body.message.trim() : req.body.message,
@@ -32,7 +33,12 @@ router.post("/chat", async (req, res): Promise<void> => {
     return;
   }
   recent.set(sender, now);
-  res.status(201).json(SendChatMessageResponse.parse(await saveMessage(parsed.data.username, parsed.data.message, trackingToken)));
+  const message = await saveMessage(parsed.data.username, parsed.data.message, trackingToken);
+  if (!message) {
+    res.status(403).json({ error: "Activity logging acceptance is required to send messages." });
+    return;
+  }
+  res.status(201).json(SendChatMessageResponse.parse(message));
 });
 
 export default router;

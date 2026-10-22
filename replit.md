@@ -46,12 +46,13 @@ The browser supports website navigation, pointer and keyboard input, back/forwar
 
 ## Owner activity and privacy
 
-- The public browser and shared chat do not require sign-in or activity-logging consent.
+- The browser and shared chat do not require sign-in, but visitors must explicitly accept the disclosed activity logging before accessing either. Declining keeps the access screen locked; there is no dismiss-to-continue option.
 - `/owner` requires Clerk sign-in using a verified address matching the shared `OWNER_EMAIL` environment variable. Do not hardcode an email or grant the first signup owner access. Development and production have separate Clerk accounts; use the configured address in each environment.
 - Clerk credentials are provisioned automatically. Keep the canonical `/api/__clerk` proxy mounted before body parsing and forward `VITE_CLERK_PROXY_URL` unchanged; development intentionally has no proxy URL.
 - Visitors must explicitly opt in before an activity ID is issued. The identifier is a random, signed browser-profile UUID, not an IP address, MAC address, fingerprint, or proven person/physical device. Clearing cookies or switching browsers creates a new identity.
 - Consenting chat messages are linked by ID; consented main-frame page navigations record origin/path, never credentials, query strings or fragments. No keystrokes are logged.
-- Stopping logging revokes the identifier server-side, including on existing remote sessions, and prevents future activity attribution. Previously recorded entries remain. Chats are still public whether or not activity logging is enabled.
+- Withdrawing acceptance revokes the identifier server-side, ends active remote browser sessions, and blocks browser/chat access until acceptance is given again. Previously recorded entries remain. Chat messages are shared with visitors who have accepted logging.
+- Enforce acceptance on the server for chat reads/writes, single-page browser runs and WebSocket upgrades; bind socket logging to the validated cookie identity, never a client-selected identity. Revoke same-instance sessions immediately and check cross-instance revocation without putting database calls in the ordered keyboard/pointer pipeline. Owner sign-in and private administration remain accessible independently of visitor acceptance.
 - Chat and browsing records are stored durably in the database. Protected `/api/owner/logs/chat.txt` and `/api/owner/logs/visits.txt` stream timestamped UTF-8 downloads on demand; deployment-local files are not used as durable storage or synced into the project workspace.
 - `/owner` polls for newly opted-in browser profiles every ten seconds while open. Review state is persistent; notifications are in-app, not email/push alerts.
 - API startup performs additive, idempotent chat/activity table setup in each environment. Schema definitions remain in `lib/db`.

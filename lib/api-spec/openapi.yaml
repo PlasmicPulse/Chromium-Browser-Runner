@@ -28,7 +28,7 @@ paths:
     post:
       operationId: setActivityConsent
       tags: [activity]
-      summary: Opt in or stop activity logging
+      summary: Accept required activity logging or withdraw acceptance and lose browser/chat access
       requestBody:
         required: true
         content:
@@ -142,6 +142,12 @@ paths:
       tags: [chat]
       summary: Latest 50 shared messages, oldest first
       responses:
+        "403":
+          description: Activity logging must be accepted before reading chat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrowserError"
         "200":
           description: Chat history
           content:
@@ -161,6 +167,12 @@ paths:
             schema:
               $ref: "#/components/schemas/ChatMessageInput"
       responses:
+        "403":
+          description: Activity logging must be accepted before sending chat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrowserError"
         "201":
           description: Message sent
           content:
@@ -197,6 +209,12 @@ paths:
             schema:
               $ref: "#/components/schemas/BrowserRunInput"
       responses:
+        "403":
+          description: Activity logging acceptance is required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrowserError"
         "200":
           description: Browser run completed
           content:

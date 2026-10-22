@@ -519,15 +519,18 @@ html, body, #root { width: 100%; height: 100%; overflow: hidden; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .owner-link { flex: none; }
 .activity-trigger.is-on { color: #315e51; background: #e1ebe3; }
-.consent-notice {
-  position: fixed; z-index: 30; right: 14px; bottom: 40px; width: min(380px, calc(100vw - 24px));
-  padding: 14px 15px; border: 1px solid #cfd8cc; border-radius: 11px; color: #263c34; background: #f7f8f2f5;
-  box-shadow: 0 16px 42px rgba(42,56,53,.16); animation: arrive .35s ease-out both; font-size: 12px;
-}
-.consent-notice-head { display: flex; align-items: center; gap: 8px; color: #315e51; }
-.consent-notice-head h2 { flex: 1; margin: 0; font-size: 13px; font-weight: 800; letter-spacing: -.02em; color: #263c34; }
-.consent-close { display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 6px; background: transparent; color: #62746b; cursor: pointer; }
-.consent-close:hover { background: #e6ece4; }
+.activity-access-shell { height: 100dvh; overflow-y: auto; display: grid; place-items: center; padding: 24px 16px; background: #eef0ea; color: #263c34; }
+.activity-access-card { width: min(100%, 520px); padding: 30px; background: #f7f8f2; border: 1px solid #cfd8cc; border-radius: 16px; box-shadow: 0 16px 42px #2a383516; }
+.activity-access-icon { display: grid; place-items: center; width: 52px; height: 52px; background: #e1ebe3; color: #315e51; border-radius: 14px; margin-bottom: 20px; }
+.activity-access-kicker { font: 10px var(--app-font-mono); text-transform: uppercase; letter-spacing: .13em; color: #62746b; }
+.activity-access-card h1 { font-size: clamp(22px, 4vw, 29px); font-weight: 700; line-height: 1.2; letter-spacing: -.04em; margin-top: 10px; }
+.activity-access-intro { font-size: 13px; line-height: 1.6; color: #4e6159; margin: 14px 0; }
+.activity-access-retention { font-size: 11px; line-height: 1.6; color: #62746b; margin-top: 16px; }
+.activity-access-status { display: flex; align-items: center; gap: 8px; padding: 12px; background: #e9eee5; border-radius: 7px; font-size: 12px; line-height: 1.5; margin-top: 16px; }
+.activity-access-card .consent-actions { margin-top: 24px; }
+.activity-access-card button:focus-visible, .activity-owner-link:focus-visible { outline: 2px solid #315e51; outline-offset: 3px; }
+.activity-owner-link { display: inline-block; font-size: 11px; color: #62746b; text-decoration: underline; margin-top: 22px; }
+.activity-settings-panel { display: flex; flex-direction: column; gap: 14px; width: min(480px, calc(100vw - 24px)); padding: 24px; background: #f7f8f2; color: #263c34; border-radius: 12px; }
 .consent-list { margin: 10px 0 0; padding-left: 16px; display: grid; gap: 6px; color: #4e6159; font-size: 12px; line-height: 1.5; list-style: disc; }
 .consent-list strong { color: #2f4240; }
 .consent-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
@@ -594,5 +597,5 @@ html, body, #root { width: 100%; height: 100%; overflow: hidden; }
 @media (max-width: 760px) {
   .device-row dl { grid-template-columns: 1fr 1fr; }
   .owner-brand span { display: none; }
-  .consent-notice { right: 12px; bottom: 32px; }
+  .activity-access-card { padding: 24px 20px; }
 }

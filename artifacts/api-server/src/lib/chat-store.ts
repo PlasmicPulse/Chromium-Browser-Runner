@@ -23,7 +23,7 @@ export async function saveMessage(username: string, message: string, trackingTok
   const result = await pool.query(
     `WITH sent AS (
       INSERT INTO chat_messages (username, message, device_id)
-      VALUES ($1, $2, (SELECT device_id FROM visitor_devices WHERE device_id = $3 AND consent_active = true))
+      SELECT $1, $2, device_id FROM visitor_devices WHERE device_id = $3 AND consent_active = true
       RETURNING ${columns}, device_id
     ), touched AS (
       UPDATE visitor_devices SET username = $1, last_seen = now() WHERE device_id IN (SELECT device_id FROM sent)
@@ -31,5 +31,5 @@ export async function saveMessage(username: string, message: string, trackingTok
     [username, message, deviceId],
   );
   const row = result.rows[0];
-  return { ...row, createdAt: row.createdAt.toISOString() };
+  return row ? { ...row, createdAt: row.createdAt.toISOString() } : null;
 }

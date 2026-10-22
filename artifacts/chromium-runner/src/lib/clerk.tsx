@@ -75,7 +75,7 @@ const clerkAppearance = {
 
 function AuthFrame({ children, title }: { children: ReactNode; title: string }) {
   useEffect(() => { document.title = `${title} - Chromium Browser Runner`; }, [title]);
-  return <div className="auth-shell">{children}<p className="auth-note">Accounts are only needed for the site owner. The public browser stays open to everyone.</p></div>;
+  return <div className="auth-shell">{children}<p className="auth-note">Accounts are only needed for the site owner. Visitors must accept activity logging to use the browser and chat.</p></div>;
 }
 
 export function SignInPage() {

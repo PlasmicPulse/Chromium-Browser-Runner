@@ -147,7 +147,7 @@ export const getSetActivityConsentUrl = () => {
 }
 
 /**
- * @summary Opt in or stop activity logging
+ * @summary Accept required activity logging or withdraw acceptance and lose browser/chat access
  */
 export const setActivityConsent = async (activityConsentInput: ActivityConsentInput, options?: Parameters<typeof customFetch>[1]): Promise<ActivityConsent> => {
 
@@ -213,7 +213,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type SetActivityConsentMutationVariables = {data: BodyType<ActivityConsentInput>}
 
     /**
- * @summary Opt in or stop activity logging
+ * @summary Accept required activity logging or withdraw acceptance and lose browser/chat access
  */
 export const useSetActivityConsent = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setActivityConsent>>, TError,SetActivityConsentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -736,7 +736,7 @@ export const getListChatMessagesQueryKey = () => {
     }
 
 
-export const getListChatMessagesQueryOptions = <TData = Awaited<ReturnType<typeof listChatMessages>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listChatMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListChatMessagesQueryOptions = <TData = Awaited<ReturnType<typeof listChatMessages>>, TError = ErrorType<BrowserError>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listChatMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -755,14 +755,14 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type ListChatMessagesQueryResult = NonNullable<Awaited<ReturnType<typeof listChatMessages>>>
-export type ListChatMessagesQueryError = ErrorType<unknown>
+export type ListChatMessagesQueryError = ErrorType<BrowserError>
 
 
 /**
  * @summary Latest 50 shared messages, oldest first
  */
 
-export function useListChatMessages<TData = Awaited<ReturnType<typeof listChatMessages>>, TError = ErrorType<unknown>>(
+export function useListChatMessages<TData = Awaited<ReturnType<typeof listChatMessages>>, TError = ErrorType<BrowserError>>(
   options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listChatMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
@@ -822,7 +822,7 @@ return customFetch<ChatMessage>(getSendChatMessageUrl(),
 
 export const getSendChatMessageMutationKey = () => ['sendChatMessage'] as const;
 
-export const getSendChatMessageMutationOptions = <TError = ErrorType<void>,
+export const getSendChatMessageMutationOptions = <TError = ErrorType<void | BrowserError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendChatMessage>>, TError,SendChatMessageMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof sendChatMessage>>, TError,SendChatMessageMutationVariables, TContext> => {
 
@@ -851,13 +851,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type SendChatMessageMutationResult = NonNullable<Awaited<ReturnType<typeof sendChatMessage>>>
     export type SendChatMessageMutationBody = BodyType<ChatMessageInput>
-    export type SendChatMessageMutationError = ErrorType<void>
+    export type SendChatMessageMutationError = ErrorType<void | BrowserError>
     export type SendChatMessageMutationVariables = {data: BodyType<ChatMessageInput>}
 
     /**
  * @summary Send a message to the shared chat
  */
-export const useSendChatMessage = <TError = ErrorType<void>,
+export const useSendChatMessage = <TError = ErrorType<void | BrowserError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendChatMessage>>, TError,SendChatMessageMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof sendChatMessage>>,

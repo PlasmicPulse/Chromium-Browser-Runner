@@ -13,7 +13,8 @@ import type { Duplex } from "node:stream";
 import { chromium } from "playwright";
 import type { BrowserContext, Page } from "playwright";
 import { acquireBrowserSlot, releaseBrowserSlot } from "../lib/browser-limits";
-import { recordVisit, requestDeviceToken } from "../lib/visitor-activity";
+import { hasActivityAcceptance, recordVisit, requestDeviceToken } from "../lib/visitor-activity";
+import { requireActivityAcceptance } from "../middlewares/activity-access";
 
 const router: IRouter = Router();
 const MAX_TEXT_LENGTH = 900;
@@ -291,7 +292,7 @@ export async function guardPageRequests(
   });
 }
 
-router.post("/browser/run", async (req, res): Promise<void> => {
+router.post("/browser/run", requireActivityAcceptance, async (req, res): Promise<void> => {
   const parsed = RunBrowserBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Enter a valid HTTP or HTTPS web address." });
@@ -367,6 +368,10 @@ router.post("/browser/run", async (req, res): Promise<void> => {
       elapsedMs: Date.now() - startedAt,
       textExcerpt: textExcerpt.replace(/\s+/g, " ").trim().slice(0, MAX_TEXT_LENGTH),
     });
+    if (!await hasActivityAcceptance(trackingToken)) {
+      res.status(403).json({ error: "Activity logging acceptance is required to use the browser." });
+      return;
+    }
     res.json(result);
   } catch (error) {
     req.log.warn({ err: error }, "Chromium page run failed");

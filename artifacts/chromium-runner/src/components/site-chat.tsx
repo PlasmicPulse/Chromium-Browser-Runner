@@ -210,8 +210,8 @@ function ChatDisclosure({ compact = false }: { compact?: boolean }) {
   return (
     <p className={`chat-disclosure${compact ? ' chat-disclosure-compact' : ''}`} data-testid="text-chat-disclosure">
       {on
-        ? 'Activity logging is on: the owner can see your messages, username and times linked to this browser\'s random ID. Messages are public either way.'
-        : 'Activity logging is off: your messages are not linked to this browser. Messages are still public to everyone here.'}
+        ? 'Activity logging is required and on: the owner can see your messages, username and times linked to this browser’s random ID. Chat messages are visible to everyone who has access.'
+        : 'Activity logging is not accepted. Browser and chat access are locked.'}
       {' Names aren’t verified—don’t share private information.'}
     </p>
   );

@@ -1,10 +1,18 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { EventEmitter } from "node:events";
 import type { Request, Response } from "express";
 import { pool } from "@workspace/db";
 
 const COOKIE = "runner_activity_device";
 const CHOICE = "runner_activity_choice";
 const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+const revocations = new EventEmitter();
+revocations.setMaxListeners(0);
+
+export function onActivityRevoked(listener: (deviceId: string) => void): () => void {
+  revocations.on("revoke", listener);
+  return () => { revocations.off("revoke", listener); };
+}
 
 function signature(id: string): string {
   const secret = process.env.SESSION_SECRET;
@@ -28,6 +36,23 @@ export function deviceIdFromToken(token: unknown): string | null {
 export function requestDeviceToken(req: Request): string | null {
   const token: unknown = req.cookies?.[COOKIE];
   return deviceIdFromToken(token) ? token as string : null;
+}
+
+export function deviceTokenFromCookieHeader(header: string | undefined): string | null {
+  try {
+    const cookie = header?.split(";").map(part => part.trim()).find(part => part.startsWith(`${COOKIE}=`));
+    const token = cookie ? decodeURIComponent(cookie.slice(COOKIE.length + 1)) : null;
+    return deviceIdFromToken(token) ? token : null;
+  } catch { return null; }
+}
+
+export async function hasActivityAcceptance(token: string | null): Promise<boolean> {
+  const id = deviceIdFromToken(token);
+  if (!id) return false;
+  const result = await pool.query(
+    "SELECT 1 FROM visitor_devices WHERE device_id = $1 AND consent_active = true", [id],
+  );
+  return result.rowCount === 1;
 }
 
 export async function initializeActivity(): Promise<void> {
@@ -92,9 +117,10 @@ export async function changeConsent(req: Request, res: Response, enabled: boolea
   };
   const previousId = deviceIdFromToken(requestDeviceToken(req));
   if (!enabled) {
-    if (previousId) await pool.query(
-      "UPDATE visitor_devices SET consent_active = false WHERE device_id = $1", [previousId],
-    );
+    if (previousId) {
+      await pool.query("UPDATE visitor_devices SET consent_active = false WHERE device_id = $1", [previousId]);
+      revocations.emit("revoke", previousId);
+    }
     res.clearCookie(COOKIE, { ...cookieOptions, maxAge: undefined });
     res.cookie(CHOICE, "declined", cookieOptions);
     return { decided: true, enabled: false, deviceId: null, token: null };

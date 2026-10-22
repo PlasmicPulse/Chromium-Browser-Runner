@@ -8,12 +8,13 @@ import NotFound from '@/pages/not-found';
 import Home from '@/pages/home';
 import OwnerPage from '@/pages/owner';
 import { ActivityConsentProvider } from '@/lib/activity-consent';
+import { ActivityAccessGate } from '@/components/activity-access-gate';
 import { ClerkProviderWithRouter, ClerkQueryClientCacheInvalidator, SignInPage, SignUpPage, basePath } from '@/lib/clerk';
 
 const queryClient = new QueryClient();
 
 function PublicHome() {
-  return <ActivityConsentProvider><Home /></ActivityConsentProvider>;
+  return <ActivityConsentProvider><ActivityAccessGate><Home /></ActivityAccessGate></ActivityConsentProvider>;
 }
 
 function Router() {

@@ -20,7 +20,7 @@ export const GetActivityConsentResponse = zod.object({
 
 
 /**
- * @summary Opt in or stop activity logging
+ * @summary Accept required activity logging or withdraw acceptance and lose browser/chat access
  */
 export const SetActivityConsentBody = zod.object({
   "enabled": zod.boolean()

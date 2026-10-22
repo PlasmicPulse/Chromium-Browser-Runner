@@ -5,7 +5,6 @@ import { remotePoint } from '@/lib/remote-point';
 import { SiteChat } from '@/components/site-chat';
 import { useActivityConsent } from '@/lib/activity-consent';
 import { ActivitySettings } from '@/components/activity-settings';
-import { ConsentNotice } from '@/components/consent-notice';
 import {
   AlertCircle, ArrowLeft, ArrowRight, ExternalLink, Globe2, LoaderCircle,
   LockKeyhole, Radio, RotateCw, ShieldCheck, Trash2, X, Maximize2, Minimize2, UserCog,
@@ -43,7 +42,7 @@ function getOrCreateProfileToken(): string {
 }
 
 export default function Home() {
-  const { consent } = useActivityConsent();
+  const { consent, refetch: refreshAcceptance } = useActivityConsent();
   const trackingTokenRef = useRef<string | null>(null);
   trackingTokenRef.current = consent?.enabled ? consent.token : null;
   const [address, setAddress] = useState('');
@@ -172,9 +171,10 @@ export default function Home() {
       setSocketError('Could not connect to the remote browser. Check the service and try again.');
       setRemoteState('error');
     });
-    socket.addEventListener('close', () => {
+    socket.addEventListener('close', (event) => {
       if (socketRef.current !== socket) return;
       socketRef.current = null;
+      if (event.code === 1008) refreshAcceptance();
       setRemoteState((state) => state === 'error' ? 'error' : 'closed');
     });
   }
@@ -450,7 +450,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-      {!maximized && <ConsentNotice />}
     </main>
   );
 }
