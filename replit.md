@@ -1,15 +1,21 @@
-# [Project name]
+# Chromium Browser Runner
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Open public websites in server-side Chromium, interact with a live browser stream, and save encrypted browser profiles for each device.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- Install dependencies: `pnpm install --frozen-lockfile`.
+- Use the existing managed workflows together: `artifacts/api-server: API Server` and `artifacts/chromium-runner: web`. The Run button starts the project; open the Chromium Browser Runner preview at `/`.
+- `pnpm --filter @workspace/api-server run dev` — install Playwright Chromium, build, and run the API server (port 8080, routes under `/api`).
+- `pnpm --filter @workspace/chromium-runner run dev` — run the React frontend. The managed workflow supplies `PORT=24927` and `BASE_PATH=/`.
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- Required environment: `DATABASE_URL` (runtime-managed PostgreSQL connection) and `SESSION_SECRET` (workspace secret used to protect saved profiles). Never commit either value. Keep `SESSION_SECRET` stable to preserve access to existing profiles.
+- After a fresh import, run `pnpm --filter @workspace/db run push` to apply the existing schema to the development database.
+- Health check: `GET /api/healthz`. Interactive sessions use `/api/browser/ws`; single-page captures use `POST /api/browser/run`.
+- The Canvas/mockup sandbox is optional and is not required to run this app.
 
 ## Stack
 
@@ -18,27 +24,34 @@ _Replace the heading above with the project's name, and this line with one sente
 - DB: PostgreSQL + Drizzle ORM
 - Validation: Zod (`zod/v4`), `drizzle-zod`
 - API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- Frontend: React + Vite
+- Browser automation: Playwright Chromium
+- Build: esbuild (ESM server bundle)
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/chromium-runner/` — frontend and browser controls.
+- `artifacts/api-server/` — Express API, live WebSocket sessions, and Chromium network safeguards.
+- `lib/db/src/schema/` — saved browser-profile schema.
+- `lib/api-spec/` — OpenAPI contract; generated clients and validation live in `lib/api-client-react/` and `lib/api-zod/`.
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+Keep the imported workspace structure and stack. Development traffic goes through the shared path-based proxy; do not add a separate frontend-to-backend proxy.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+The browser supports website navigation, pointer and keyboard input, back/forward, reload, and encrypted saved cookies/site data. Private and reserved destinations are blocked. At most two remote browser sessions run concurrently; idle sessions expire after ten minutes.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+The import setup request is to get the existing app running on Replit, without restructuring it.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- The API dev command cleans and rebuilds its output before starting. Do not run a standalone API build concurrently with its workflow startup.
+- Playwright downloads Chromium on the first API build. Its Linux libraries are declared in `.replit`.
+- Both `/api` and `/api/browser/ws` must remain routed to the API service.
 
 ## Pointers
 
