@@ -2,3 +2,4 @@
 - [Playwright deployment packaging](playwright-deployment.md) — Chromium must be installed and launched from a deployment-included path, not the excluded workspace cache.
 - [Remote browser responsiveness](remote-input-latency.md) — Screenshot capture must not block ordered input; drop stale visual work rather than accumulating latency.
 - [Browser display requirements](display-requirements.md) — Fit width with scrolling, in-page maximization rather than native fullscreen, and a normal mouse cursor.
+- [Auth provisioning](auth-provisioning.md) — Managed Clerk rejects archive-style project titles ending in .zip; rename the project before provisioning.
