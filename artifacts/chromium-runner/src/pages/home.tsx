@@ -363,6 +363,13 @@ export default function Home() {
     <main className="runner-shell">
       <section className="browser-app" aria-label="Remote browser">
         <div className={`browser-chrome ${maximized ? 'is-maximized' : ''}`}>
+          <div className="browser-brandline" aria-label="Chromium remote browser">
+            <span className="browser-brand-mark" aria-hidden="true"><span /></span>
+            <span className="browser-brand-name">CHROMIUM <b>REMOTE</b></span>
+            <span className={`browser-session-state state-${remoteState}`} data-testid="status-session">
+              <i aria-hidden="true" />{connectionLabel}
+            </span>
+          </div>
           <div className="toolbar">
               <div className="toolbar-navigation" role="group" aria-label="Browser navigation">
                 <button type="button" className="icon-button" aria-label="Go back" title="Go back" disabled={!connected} onClick={() => send({ type: 'back' })} data-testid="button-back"><ArrowLeft size={17} /></button>

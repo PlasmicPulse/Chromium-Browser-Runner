@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getListChatMessagesQueryKey, listChatMessages, sendChatMessage, type ChatMessage, type ChatMessageInput } from '@workspace/api-client-react';
 import { ArrowRight, MessageCircle, Pencil, Send } from 'lucide-react';
@@ -6,20 +6,93 @@ import { useActivityConsent } from '@/lib/activity-consent';
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { rememberSentChat, savedChatName, saveChatName, sentChatIds, validChatName } from '@/lib/chat-identity';
 
+const CHAT_READ_CURSOR_KEY = 'chromium-runner-chat-read-cursor-v1';
+
+function loadChatReadCursor(): number | null {
+  try {
+    const value = localStorage.getItem(CHAT_READ_CURSOR_KEY);
+    if (!value) return null;
+    const cursor = Number(value);
+    return Number.isSafeInteger(cursor) && cursor >= 0 ? cursor : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveChatReadCursor(cursor: number): void {
+  try { localStorage.setItem(CHAT_READ_CURSOR_KEY, String(cursor)); } catch { /* Unread state still works for this page view. */ }
+}
+
 export function SiteChat() {
   const [open, setOpen] = useState(false);
   const [username, setUsername] = useState(savedChatName);
   const ownIdsRef = useRef(sentChatIds());
+  const [unread, setUnread] = useState(false);
+  const [readingHistory, setReadingHistory] = useState(false);
+  const lastReadCursorRef = useRef(loadChatReadCursor());
+  const readCursorInitializedRef = useRef(lastReadCursorRef.current !== null);
+  const { consent } = useActivityConsent();
+  const queryClient = useQueryClient();
+  const key = getListChatMessagesQueryKey();
+  const messageFeed = useQuery({
+    queryKey: key,
+    queryFn: ({ signal }) => listChatMessages({ signal }),
+    enabled: !!consent?.enabled && !open,
+    refetchInterval: 5000,
+    refetchIntervalInBackground: false,
+    staleTime: 0,
+  });
+
+  useEffect(() => {
+    const messages = messageFeed.data;
+    if (!messages) return;
+    const latestId = messages.reduce((latest, item) => Math.max(latest, item.id), 0);
+
+    if (!readCursorInitializedRef.current) {
+      lastReadCursorRef.current = latestId;
+      readCursorInitializedRef.current = true;
+      saveChatReadCursor(latestId);
+      return;
+    }
+
+    if (readingHistory) {
+      if (latestId > (lastReadCursorRef.current ?? 0)) {
+        lastReadCursorRef.current = latestId;
+        saveChatReadCursor(latestId);
+      }
+      setUnread(false);
+      return;
+    }
+
+    setUnread(latestId > (lastReadCursorRef.current ?? 0));
+  }, [messageFeed.data, readingHistory]);
 
   function chooseName(name: string) {
     saveChatName(name);
     setUsername(name);
   }
 
+  const handleHistoryVisibilityChange = useCallback((visible: boolean) => {
+    setReadingHistory(open && visible);
+  }, [open]);
+
+  function handleOpenChange(nextOpen: boolean) {
+    setOpen(nextOpen);
+    setReadingHistory(nextOpen && !!username);
+    if (!nextOpen) setUnread(false);
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <button type="button" className="icon-button" aria-label="Open community chat" title="Community chat" data-testid="button-chat"><MessageCircle size={17} /><span className="tools-label">Community chat</span></button>
+        <button type="button" className="icon-button chat-trigger"
+          aria-label={unread ? 'Open community chat, unread messages' : 'Open community chat'}
+          title={unread ? 'Community chat — new messages' : 'Community chat'}
+          data-testid="button-chat" data-unread={unread}>
+          <MessageCircle size={17} />
+          {unread && <span className="chat-unread-dot" aria-hidden="true" data-testid="chat-unread-dot" />}
+          <span className="tools-label">Community chat</span>
+        </button>
       </DialogTrigger>
       <DialogContent className="site-chat" onKeyDown={event => event.stopPropagation()}>
         <header className="chat-room-header">
@@ -29,16 +102,18 @@ export function SiteChat() {
             <DialogDescription>Everyone here · Latest 50 messages</DialogDescription>
           </div>
         </header>
-        {open && <ChatRoom username={username} chooseName={chooseName} ownIdsRef={ownIdsRef} />}
+        {open && <ChatRoom username={username} chooseName={chooseName} ownIdsRef={ownIdsRef}
+          onHistoryVisibilityChange={handleHistoryVisibilityChange} />}
       </DialogContent>
     </Dialog>
   );
 }
 
-function ChatRoom({ username, chooseName, ownIdsRef }: {
+function ChatRoom({ username, chooseName, ownIdsRef, onHistoryVisibilityChange }: {
   username: string;
   chooseName: (name: string) => void;
   ownIdsRef: { current: number[] };
+  onHistoryVisibilityChange: (visible: boolean) => void;
 }) {
   const [editingName, setEditingName] = useState(!username);
   const [draftName, setDraftName] = useState(username);
@@ -76,6 +151,10 @@ function ChatRoom({ username, chooseName, ownIdsRef }: {
     const element = historyRef.current;
     if (element && keepBottom.current) element.scrollTop = element.scrollHeight;
   }, [history.data, editingName]);
+
+  useEffect(() => {
+    onHistoryVisibilityChange(!editingName);
+  }, [editingName, onHistoryVisibilityChange]);
 
   useEffect(() => {
     if (editingName) return;

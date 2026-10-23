@@ -135,6 +135,38 @@
 .pet-room-object:focus-visible { z-index: 4; outline: 2px solid #b76845; outline-offset: 1px; }
 .pet-room-object > svg { display: block; width: 100%; height: 100%; pointer-events: none; }
 .pet-room-object svg { cursor: inherit; }
+.pet-drawer { border-color: #c6d9ce; color: #173536; background: #f4f8f1; box-shadow: 0 24px 70px rgba(12,38,36,.27); }
+.pet-head { border-color: #d9e5dc; }
+.pet-kicker { color: #718f3d; }
+.pet-close { color: #55746b; transition: background .16s, transform .16s; }
+.pet-close:hover { color: #173536; background: #e2eee5; transform: rotate(4deg); }
+.pet-mood-chip { color: #315b4c; background: #dff0d0; }
+.pet-line { color: #668079; }
+.pet-edit input, .pet-look, .pet-room-background, .pet-furniture-item { border-color: #c6d8ce; }
+.pet-edit input { color: #173536; background: #fbfcf8; }
+.pet-small-btn { border-color: #c6d8ce; color: #315b54; }
+.pet-small-btn:hover, .pet-look:hover, .pet-room-background:hover, .pet-furniture-item:hover { background: #e7f0e7; }
+.pet-meter-row { color: #49645e; }
+.pet-meter-row progress, .pet-meter-row progress::-webkit-progress-bar { background: #dce8e0; }
+.pet-meter-row progress::-webkit-progress-value, .pet-meter-row progress::-moz-progress-bar { background: #579475; }
+.pet-action { border-color: #d2e0d7; background: #fbfcf8; color: #315e51; transition: background .16s, transform .16s, box-shadow .16s; }
+.pet-action:hover { background: #e7f0e7; box-shadow: 0 4px 12px rgba(22,53,54,.08); }
+.pet-action[aria-pressed="true"], .pet-small-btn.is-game { border-color: #1e4e48; background: #1e4e48; color: #f5f8f3; }
+.pet-note { background: #e7f0e7; color: #54716b; }
+.pet-note strong, .pet-customizer h3 { color: #1e4e48; }
+.pet-look.is-selected, .pet-room-background.is-selected, .pet-furniture-item.is-selected { border-color: #6c9a83; background: #dff0d0; color: #1e4e48; box-shadow: inset 0 0 0 1px #6c9a83; }
+.pet-customizer { border-color: #d2e0d7; background: #eef4ed; }
+.pet-customizer-label, .pet-hint, .pet-room-help { color: #6a8179; }
+.pet-room-object:hover { border-color: rgba(49,94,81,.45); }
+.pet-room-object.is-dragging { border-color: #6c9a83; }
+.pet-close:focus-visible, .pet-action:focus-visible, .pet-small-btn:focus-visible,
+.pet-look:focus-visible, .pet-room-background:focus-visible, .pet-furniture-item:focus-visible,
+.pet-room-object:focus-visible { outline-color: #ef7058; }
+.pet-bed-caption, .roam-tag, .pet-scoreboard span { border-color: #d2e0d7; background: #f4f8f1; color: #315b4c; }
+.pet-bed.has-visitor .pet-bed-caption { background: #dff0d0; color: #1e4e48; }
+.roam-z { color: #4e7166; }
+.pet-best { color: #718f3d; }
+.pet-small-btn.is-game:hover { background: #173d3a; }
 @media (prefers-reduced-motion: reduce) {
   .roam-pet, .roam-body, .pet-chase { transition: none !important; }
   .roam-svg, .pet-heart, .pet-acorn { animation: none !important; }

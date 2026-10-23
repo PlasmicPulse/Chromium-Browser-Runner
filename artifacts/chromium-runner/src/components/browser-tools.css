@@ -22,3 +22,52 @@
 .tools-color-control input:focus-visible, .tools-color-reset:focus-visible { outline: 2px solid #426e60; outline-offset: 2px; }
 .tools-color-reset { align-self: flex-start; min-height: 32px; padding: 0 11px; border: 1px solid #d2dbd0; border-radius: 8px; background: transparent; color: #53675e; cursor: pointer; font: 600 11px var(--app-font-sans); }
 .tools-color-reset:hover { background: #e3ece2; }
+
+.browser-tools-toggle {
+  border-color: #bdd1c7;
+  color: #173e3d;
+  background: #eff7e3;
+  box-shadow: -5px 5px 20px rgba(22,53,54,.14);
+  transition: background .18s, color .18s, width .18s;
+}
+.browser-tools-toggle:hover, .browser-tools-toggle.is-open { width: 36px; color: #173536; background: #c9f36a; }
+.browser-tools-panel {
+  right: 43px;
+  width: min(310px, calc(100vw - 66px));
+  padding: 22px 16px;
+  border-color: #234d4d;
+  border-radius: 19px;
+  color: #e4eee7;
+  background: linear-gradient(165deg, #1c4443, #143534 88%);
+  box-shadow: 0 20px 55px rgba(10,31,32,.3);
+}
+.browser-tools-panel header p { color: #c9f36a; }
+.browser-tools-panel h2 { color: #f3f6ed; font-size: 20px; }
+.browser-tools-panel header span { color: #b4c9c1; }
+.browser-tools-panel h3 { color: #a4c5b5; }
+.browser-tools-panel .icon-button { color: #d0e0d8; }
+.browser-tools-panel .icon-button:hover:not(:disabled), .browser-tools-panel .new-session-button:hover { color: #f6ffe8; background: #2d5a52; }
+.browser-tools-panel .icon-button:disabled { color: #718d85; }
+.browser-tools-panel .new-session-button { color: #d9e8dc; border-color: #496c61; }
+.browser-tools-panel .tools-color-control { color: #d7e7dc; border-color: #47665d; background: #204744; }
+.browser-tools-panel .tools-color-control input { border-color: #789888; background: #eaf2e6; }
+.browser-tools-panel .tools-color-reset { color: #c4d9cd; border-color: #496b60; }
+.browser-tools-panel .tools-color-reset:hover { color: #f6ffe8; background: #2d5a52; }
+.browser-tools-panel .bookmarks-note { color: #aac4b8; }
+.browser-tools-panel .bookmark-row { border-color: #416159; background: #204744; }
+.browser-tools-panel .bookmark-open { color: #d9e8dc; }
+.browser-tools-panel .bookmark-open:hover { background: #2d5a52; }
+.browser-tools-panel .bookmark-copy strong { color: #ecf4e9; }
+.browser-tools-panel .bookmark-copy small { color: #a9c1b7; }
+.browser-tools-panel .bookmark-external { color: #8ca99d; }
+.browser-tools-panel .bookmark-remove { color: #d49a88; }
+.browser-tools-panel .bookmark-remove:hover { color: #ffc8b5; background: #684b43; }
+.browser-tools-panel .bookmarks-empty { color: #c0d3c9; border-color: #55756a; }
+.browser-tools-panel .bookmark-open:focus-visible, .browser-tools-panel .bookmark-remove:focus-visible,
+.browser-tools-panel .icon-button:focus-visible, .browser-tools-panel .new-session-button:focus-visible,
+.browser-tools-panel .tools-color-control input:focus-visible, .browser-tools-panel .tools-color-reset:focus-visible {
+  outline-color: #ef7058;
+}
+@media (max-width: 520px) {
+  .browser-tools-panel { right: 38px; width: min(310px, calc(100vw - 54px)); }
+}

@@ -1,0 +1,26 @@
+@scope (.browser-runner-mockup) {
+.tools-label { display: none; }
+.browser-tools-toggle { position: fixed; z-index: 46; right: 0; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 30px; height: 64px; border: 1px solid #bccdc0; border-right: 0; border-radius: 12px 0 0 12px; color: #315e51; background: #f7f8f2; box-shadow: -3px 2px 16px #263c3414; }
+.browser-tools-toggle:hover, .browser-tools-toggle.is-open { background: #e1ebe3; }
+.browser-tools-toggle:focus-visible { outline: 2px solid #426e60; outline-offset: -4px; }
+.browser-tools-panel { position: fixed; z-index: 45; right: 38px; top: 8px; bottom: 8px; width: min(282px, calc(100vw - 54px)); overflow-y: auto; overscroll-behavior: contain; border: 1px solid #cfd8cc; border-radius: 16px; background: #f7f8f2; color: #263c34; box-shadow: 0 12px 40px #263c3424; padding: 20px 14px; }
+.browser-tools-panel[hidden] { display: none; }
+.browser-tools-panel header { margin: 0 4px 20px; }
+.browser-tools-panel header p { font: 9px var(--app-font-mono); letter-spacing: .13em; color: #62746b; }
+.browser-tools-panel h2 { font-size: 19px; font-weight: 700; letter-spacing: -.04em; margin-top: 7px; }
+.browser-tools-panel header span { display: block; font-size: 11px; color: #62746b; line-height: 1.6; margin-top: 6px; }
+.browser-tools-panel .tools-label { display: inline; }
+.browser-tools-panel .tools-section { display: flex; flex-direction: column; gap: 5px; margin-top: 18px; }
+.browser-tools-panel h3 { margin: 0 8px 4px; font: 9px var(--app-font-mono); letter-spacing: .09em; text-transform: uppercase; color: #738377; }
+.browser-tools-panel .icon-button, .browser-tools-panel .new-session-button { display: flex; justify-content: flex-start; align-items: center; gap: 11px; width: 100%; height: auto; min-height: 42px; padding: 10px 12px; border: 0; border-radius: 9px; font-size: 12px; text-align: left; white-space: normal; }
+.browser-tools-panel .icon-button svg, .browser-tools-panel .new-session-button svg { flex: none; }
+.browser-tools-panel .icon-button:hover:not(:disabled), .browser-tools-panel .new-session-button:hover { background: #e3ece2; }
+.browser-tools-panel .new-session-button { margin: 0; }
+.browser-tools-panel .new-session-label { display: inline; }
+.browser-tools-panel .icon-button:focus-visible, .browser-tools-panel .new-session-button:focus-visible { outline: 2px solid #426e60; outline-offset: 1px; }
+.tools-color-control { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 42px; padding: 7px 12px; border: 1px solid #d6dfd2; border-radius: 9px; background: #fbfcf7; color: #344b42; font-size: 12px; font-weight: 650; }
+.tools-color-control input { width: 42px; height: 30px; padding: 2px; border: 1px solid #c7d2c7; border-radius: 7px; background: #fff; cursor: pointer; }
+.tools-color-control input:focus-visible, .tools-color-reset:focus-visible { outline: 2px solid #426e60; outline-offset: 2px; }
+.tools-color-reset { align-self: flex-start; min-height: 32px; padding: 0 11px; border: 1px solid #d2dbd0; border-radius: 8px; background: transparent; color: #53675e; cursor: pointer; font: 600 11px var(--app-font-sans); }
+.tools-color-reset:hover { background: #e3ece2; }
+}
