@@ -19,7 +19,7 @@ export function SiteChat() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button type="button" className="icon-button" aria-label="Open community chat" title="Community chat" data-testid="button-chat"><MessageCircle size={17} /></button>
+        <button type="button" className="icon-button" aria-label="Open community chat" title="Community chat" data-testid="button-chat"><MessageCircle size={17} /><span className="tools-label">Community chat</span></button>
       </DialogTrigger>
       <DialogContent className="site-chat" onKeyDown={event => event.stopPropagation()}>
         <header className="chat-room-header">

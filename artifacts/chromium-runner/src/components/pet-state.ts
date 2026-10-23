@@ -88,3 +88,14 @@ export function load(): { pet: PetState; storage: boolean } {
 export function save(p: PetState): boolean {
   try { window.localStorage.setItem(PET_KEY, JSON.stringify(p)); return true; } catch { return false; }
 }
+
+/** Gentle petting: small happiness lift. Caller applies cooldown. */
+export function applyPetting(p: PetState): PetState {
+  return { ...p, resting: false, happiness: clamp(p.happiness + 2.5) };
+}
+
+/** Acorn-chase result: happiness and a little energy from a good run (no penalty for low scores). */
+export function applyGame(p: PetState, score: number): PetState {
+  const s = Math.max(0, Math.min(40, Math.floor(score)));
+  return { ...p, resting: false, happiness: clamp(p.happiness + Math.min(22, 4 + s * 2)), energy: clamp(p.energy + Math.min(8, s * 0.75)), hunger: clamp(p.hunger - 2) };
+}

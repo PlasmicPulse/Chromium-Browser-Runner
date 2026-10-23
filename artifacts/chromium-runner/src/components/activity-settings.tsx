@@ -11,7 +11,7 @@ export function ActivitySettings() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button type="button" className={`icon-button activity-trigger ${on ? 'is-on' : ''}`} aria-label={`Activity logging settings (${on ? 'on' : 'off'})`} title="Activity logging" data-testid="button-activity-settings"><Fingerprint size={16} /></button>
+        <button type="button" className={`icon-button activity-trigger ${on ? 'is-on' : ''}`} aria-label={`Activity logging settings (${on ? 'on' : 'off'})`} title="Activity logging" data-testid="button-activity-settings"><Fingerprint size={16} /><span className="tools-label">Activity settings</span></button>
       </DialogTrigger>
       <DialogContent className="activity-settings-panel" onKeyDown={event => event.stopPropagation()}>
         <DialogTitle>Activity logging</DialogTitle>

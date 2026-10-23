@@ -5,8 +5,10 @@ import { DEFAULT_TAB_APPEARANCE, tabIconUrl, type TabAppearance, type TabIcon } 
 import { useTabAppearance } from '@/lib/tab-appearance-context';
 import './tab-disguise.css';
 
-const presets: TabAppearance[] = [
-  { title: 'New Tab', icon: 'blank' }, { title: 'Notes', icon: 'notes' }, { title: 'Calculator', icon: 'calculator' },
+const presets: (TabAppearance & { label: string })[] = [
+  { label: 'New Tab', title: 'New Tab', icon: 'blank' },
+  { label: 'Word document', title: 'Document - Word', icon: 'word' },
+  { label: 'Clever', title: 'Clever | Portal', icon: 'clever' },
 ];
 
 export function TabDisguise() {
@@ -26,20 +28,20 @@ export function TabDisguise() {
   return (
     <Dialog open={open} onOpenChange={next => { setOpen(next); if (next) { setDraft(appearance); setFeedback(''); } }}>
       <DialogTrigger asChild>
-        <button className="icon-button" type="button" aria-label="Tab disguise settings" title="Tab disguise" data-testid="button-tab-disguise"><PanelsTopLeft size={16} /></button>
+        <button className="icon-button" type="button" aria-label="Tab disguise settings" title="Tab disguise" data-testid="button-tab-disguise"><PanelsTopLeft size={16} /><span className="tools-label">Tab disguise</span></button>
       </DialogTrigger>
       <DialogContent className="activity-settings-panel tab-disguise" onKeyDown={event => event.stopPropagation()}>
         <DialogTitle>Tab disguise</DialogTitle>
         <DialogDescription>Choose the title and icon shown in your browser’s tab list. Your choice stays the same on the owner dashboard and sign-in pages.</DialogDescription>
         <form onSubmit={submit} className="tab-disguise-form">
           <div className="tab-disguise-presets" aria-label="Tab presets">
-            {presets.map(preset => <button className="consent-secondary" type="button" key={preset.title} onClick={() => { setDraft(preset); setFeedback(''); }}>{preset.title}</button>)}
+            {presets.map(({ label, ...preset }) => <button className="consent-secondary" type="button" key={preset.icon} onClick={() => { setDraft(preset); setFeedback(''); }}><img src={tabIconUrl(preset.icon)} alt="" width={18} height={18} />{label}</button>)}
           </div>
           <label htmlFor="tab-disguise-title">Tab title</label>
           <input id="tab-disguise-title" data-testid="input-tab-title" autoComplete="off" value={draft.title} required maxLength={80} onChange={event => { setDraft({ ...draft, title: event.target.value }); setFeedback(''); }} />
           <label htmlFor="tab-disguise-icon">Tab icon</label>
           <select id="tab-disguise-icon" value={draft.icon} onChange={event => { setDraft({ ...draft, icon: event.target.value as TabIcon }); setFeedback(''); }}>
-            <option value="browser">Browser</option><option value="notes">Notes</option><option value="calculator">Calculator</option><option value="blank">Blank</option>
+            <option value="blank">New Tab (blank)</option><option value="word">Word document</option><option value="clever">Clever</option>
           </select>
           <div className="tab-disguise-preview" aria-label="Tab preview"><img src={tabIconUrl(draft.icon)} alt="" width={17} height={17} /><span>{draft.title.trim() || 'Tab title'}</span><span aria-hidden="true">×</span></div>
           <p className="chat-muted">Changes only this site’s title and icon, not its URL, browsing history, activity logging, or access controls.</p>

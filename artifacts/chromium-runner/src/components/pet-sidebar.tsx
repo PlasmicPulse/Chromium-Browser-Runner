@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Bath, Carrot, Moon, PawPrint, Pencil, Sparkles, X } from "lucide-react";
+import { Bath, Carrot, Hand, Moon, Pencil, Sparkles, Timer, X } from "lucide-react";
+import { RoamingPet } from "./roaming-pet";
 import "./pet-sidebar.css";
-import { apply, decay, load, mood, sanitizeName, save, type PetAction, type PetState } from "./pet-state";
+import { apply, applyGame, applyPetting, decay, load, mood, sanitizeName, save, type PetAction, type PetState } from "./pet-state";
 
 const TICK_MS = 30_000;
 const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
-function Habitat({ pet, moodKey }: { pet: PetState; moodKey: string }) {
+function Habitat({ pet, moodKey, dx = 0, onPet }: { pet: PetState; moodKey: string; dx?: number; onPet?: () => void }) {
   const sleeping = moodKey === "sleepy";
   const messy = pet.hygiene < 35;
   return (
-    <svg viewBox="0 0 320 236" role="img" aria-label={`${pet.name} the moss-hedgehog in a fern hollow`}>
+    <svg viewBox="0 0 320 236" role="img" onClick={onPet} aria-label={`${pet.name} the moss-hedgehog in a fern hollow`}>
       <rect width="320" height="236" fill="#e8eedf" />
       <circle cx="262" cy="46" r="22" fill={sleeping ? "#d8dccb" : "#f1d9a8"} />
       <path d="M0 150 Q80 120 160 140 T320 130 V236 H0Z" fill="#cddcc6" />
@@ -26,7 +27,7 @@ function Habitat({ pet, moodKey }: { pet: PetState; moodKey: string }) {
       {!sleeping && moodKey === "joy" && (
         <g fill="#c98a52"><circle className="pet-spark" cx="108" cy="92" r="3" /><circle className="pet-spark" cx="214" cy="84" r="2.5" /></g>
       )}
-      <g className="pet-critter">
+      <g className="pet-chase" style={{ transform: `translateX(${dx}px)` }}><g className="pet-critter">
         <path d="M104 186 Q100 108 160 102 Q222 106 216 186Z" fill="#567c6c" />
         <g fill="#3f6556">{[0,1,2,3,4,5,6].map((i) => <path key={i} d={`M${112 + i * 15} ${120 - Math.abs(3 - i) * -2} l7 -14 l7 14z`} />)}</g>
         <ellipse cx="160" cy="160" rx="42" ry="32" fill="#f2e6cf" />
@@ -40,7 +41,7 @@ function Habitat({ pet, moodKey }: { pet: PetState; moodKey: string }) {
         <path d={moodKey === "joy" ? "M150 171 q10 9 20 0" : moodKey === "calm" || sleeping ? "M153 172 q7 4 14 0" : "M153 175 q7 -4 14 0"} stroke="#293b3d" strokeWidth="2.4" fill="none" strokeLinecap="round" />
         <ellipse cx="130" cy="188" rx="10" ry="6" fill="#3f6556" /><ellipse cx="190" cy="188" rx="10" ry="6" fill="#3f6556" />
         {messy && <g fill="#8a6a4a"><circle cx="122" cy="140" r="4" /><circle cx="198" cy="134" r="3" /><path d="M176 112 l10 -4 l-2 8z" /></g>}
-      </g>
+      </g></g>
       {sleeping && <text className="pet-z" x="212" y="104" fill="#5d706c" fontSize="18" fontWeight="800">z</text>}
     </svg>
   );
@@ -55,6 +56,12 @@ export function PetSidebar() {
   const [bounce, setBounce] = useState(false);
   const [notice, setNotice] = useState("");
   const bounceT = useRef<number | undefined>(undefined);
+  const petT = useRef(0);
+  const avatarRef = useRef<HTMLButtonElement>(null);
+  const [hearts, setHearts] = useState(0);
+  const [game, setGame] = useState<{ on: boolean; score: number; left: number; ax: number; ay: number; best: number }>({ on: false, score: 0, left: 0, ax: 160, ay: 120, best: 0 });
+  const [dx, setDx] = useState(0);
+  const scoreRef = useRef(0);
 
   const update = useCallback((fn: (p: PetState) => PetState) => {
     setBox((b) => {
@@ -74,13 +81,65 @@ export function PetSidebar() {
 
   useEffect(() => () => window.clearTimeout(bounceT.current), []);
 
-  const act = (a: PetAction) => {
-    update((p) => apply(p, a));
-    const msg = { feed: "Crunch crunch. Clover biscuit gone.", play: "Acorn chase! Tail-wiggles all round.", rest: pet.resting ? "Stretching awake." : "Settling into the moss for a nap.", clean: "Splash. Quills sparkling again." }[a];
+  const react = (msg: string) => {
     setNotice(msg);
     setBounce(true);
     window.clearTimeout(bounceT.current);
     bounceT.current = window.setTimeout(() => setBounce(false), 1000);
+  };
+
+  const petPip = () => {
+    const now = Date.now();
+    setHearts((h) => h + 1);
+    if (now - petT.current < 4000) { setNotice(`${pet.name} leans into the scratch. Quills soft as moss.`); return; }
+    petT.current = now;
+    update(applyPetting);
+    react(pet.resting ? `${pet.name} snuffles in their sleep and smiles.` : [`${pet.name} purrs a tiny hedgehog purr.`, `Happy wiggle. ${pet.name} rolls half over.`, `${pet.name} boops your hand with a damp nose.`][now % 3]);
+  };
+
+  const newAcorn = () => ({ ax: 40 + Math.random() * 240, ay: 70 + Math.random() * 110 });
+  const startGame = () => {
+    if (pet.resting) update((p) => ({ ...p, resting: false }));
+    scoreRef.current = 0;
+    setGame((g) => ({ ...g, on: true, score: 0, left: 15, ...newAcorn() }));
+    setNotice(`Acorn chase! Tap the acorns before ${pet.name} loses interest.`);
+  };
+  const catchAcorn = () => {
+    scoreRef.current += 1;
+    setDx(Math.max(-110, Math.min(110, game.ax - 160)));
+    setGame((g) => ({ ...g, score: g.score + 1, ...newAcorn() }));
+    react(scoreRef.current % 5 === 0 ? `${scoreRef.current} acorns! ${pet.name} is on a roll.` : `Got it! ${pet.name} scurries over.`);
+  };
+  // Countdown + acorn hops away if not caught.
+  useEffect(() => {
+    if (!game.on) return;
+    const id = window.setInterval(() => {
+      setGame((g) => {
+        if (!g.on) return g;
+        const left = g.left - 1;
+        if (left <= 0) return { ...g, on: false, left: 0, best: Math.max(g.best, g.score) };
+        return left % 2 === 0 ? { ...g, left, ...newAcorn() } : { ...g, left };
+      });
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [game.on]);
+  const wasOn = useRef(false);
+  useEffect(() => {
+    if (wasOn.current && !game.on) {
+      const s = scoreRef.current;
+      update((p) => applyGame(p, s));
+      setDx(0);
+      react(s === 0 ? `${pet.name} sniffs around. Next round?` : `Round over: ${s} acorn${s === 1 ? "" : "s"}. ${pet.name} is beaming and a bit more awake.`);
+    }
+    wasOn.current = game.on;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game.on]);
+  useEffect(() => { if (!open) setGame((g) => (g.on ? { ...g, on: false, left: 0, best: Math.max(g.best, g.score) } : g)); }, [open]);
+
+  const act = (a: PetAction) => {
+    update((p) => apply(p, a));
+    const msg = { feed: "Crunch crunch. Clover biscuit gone.", play: "Acorn chase! Tail-wiggles all round.", rest: pet.resting ? "Stretching awake." : "Settling into the moss for a nap.", clean: "Splash. Quills sparkling again." }[a];
+    react(msg);
   };
 
   const m = mood(pet);
@@ -88,15 +147,14 @@ export function PetSidebar() {
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen} modal={false}>
-      <Dialog.Trigger className="icon-button" aria-label="Open pet companion" data-testid="button-pet" title="Pet companion">
-        <PawPrint size={16} />
-      </Dialog.Trigger>
+      <RoamingPet ref={avatarRef} name={pet.name} moodKey={m.key} open={open} onOpen={() => setOpen(true)} />
       <Dialog.Portal>
         <Dialog.Content
           className={`pet-drawer mood-${m.key}${bounce ? " pet-bounce" : ""}`}
           data-testid="panel-pet"
           onInteractOutside={(e) => e.preventDefault()}
           onOpenAutoFocus={(e) => e.preventDefault()}
+          onCloseAutoFocus={(e) => { e.preventDefault(); avatarRef.current?.focus({ preventScroll: true }); }}
           onKeyDown={stop} onKeyUp={stop} onKeyPress={stop}
           onPointerDown={stop} onMouseDown={stop} onWheel={stop} onTouchStart={stop}
         >
@@ -109,12 +167,30 @@ export function PetSidebar() {
           </div>
           <div className="pet-body">
             <Dialog.Description className="pet-live">Care for your moss-hedgehog. Saved only on this browser.</Dialog.Description>
-            <div className="pet-habitat"><Habitat pet={pet} moodKey={m.key} /></div>
+            <div className={`pet-habitat${game.on ? " is-game" : ""}`}>
+              <Habitat pet={pet} moodKey={game.on ? "joy" : m.key} dx={dx} onPet={game.on ? undefined : petPip} />
+              {!game.on && <span key={hearts} className={hearts ? "pet-heart" : "pet-heart is-idle"} aria-hidden="true" />}
+              {game.on && (
+                <button type="button" className="pet-acorn" style={{ left: `${(game.ax / 320) * 100}%`, top: `${(game.ay / 236) * 100}%` }}
+                  onClick={catchAcorn} aria-label={`Catch the acorn. Score ${game.score}, ${game.left} seconds left`} data-testid="button-pet-acorn">
+                  <svg viewBox="0 0 24 28" aria-hidden="true"><path d="M3 10 Q12 2 21 10 Z" fill="#6b4a2e" /><path d="M12 3 v-3" stroke="#6b4a2e" strokeWidth="2" /><path d="M4 10 h16 q0 14 -8 16 q-8 -2 -8 -16z" fill="#c98a52" /></svg>
+                </button>
+              )}
+              {game.on && <div className="pet-scoreboard" data-testid="status-pet-game"><span>Acorns {game.score}</span><span><Timer size={11} /> {game.left}s</span></div>}
+            </div>
+            <div className="pet-game-row">
+              <button type="button" className="pet-small-btn" onClick={petPip} disabled={game.on} data-testid="button-pet-pet"><Hand size={12} /> Pet</button>
+              <button type="button" className="pet-small-btn is-game" onClick={game.on ? () => setGame((g) => ({ ...g, on: false, left: 0, best: Math.max(g.best, g.score) })) : startGame} data-testid="button-pet-game">
+                <Sparkles size={12} /> {game.on ? "End chase" : "Acorn chase"}
+              </button>
+              {game.best > 0 && <span className="pet-best" data-testid="text-pet-best">Best {game.best}</span>}
+            </div>
+            <p className="pet-hint">Tap {pet.name} in the hollow to pet. In Acorn chase, tap or press Enter on each acorn within 15 seconds; every catch lifts happiness and energy.</p>
             <div className="pet-nameplate">
               <span className="pet-name" data-testid="text-pet-name">{pet.name}</span>
               <span className="pet-mood-chip" data-testid="status-pet-mood">{m.label}</span>
             </div>
-            <p className="pet-line" aria-live="polite" data-testid="text-pet-feedback">{notice || m.line}</p>
+            <p className="pet-line" role="status" aria-live="polite" data-testid="text-pet-feedback">{notice || m.line}</p>
             {editing ? (
               <form className="pet-edit" onSubmit={(e) => { e.preventDefault(); update((p) => ({ ...p, name: sanitizeName(draft) })); setEditing(false); }}>
                 <input aria-label="Pet name" maxLength={20} value={draft} autoFocus onChange={(e) => setDraft(e.target.value)} data-testid="input-pet-name" />

@@ -7,6 +7,7 @@ import { useActivityConsent } from '@/lib/activity-consent';
 import { ActivitySettings } from '@/components/activity-settings';
 import { TabDisguise } from '@/components/tab-disguise';
 import { PetSidebar } from '@/components/pet-sidebar';
+import { BrowserTools } from '@/components/browser-tools';
 import {
   AlertCircle, ArrowLeft, ArrowRight, ExternalLink, Globe2, LoaderCircle,
   LockKeyhole, Radio, RotateCw, ShieldCheck, Trash2, X, Maximize2, Minimize2, UserCog,
@@ -298,11 +299,6 @@ export default function Home() {
       <section className="browser-app" aria-label="Remote browser">
         <div className={`browser-chrome ${maximized ? 'is-maximized' : ''}`}>
           <div className="toolbar">
-            <div className="history-controls">
-              <button type="button" className="icon-button" aria-label="Go back" title="Back" disabled={!connected} onClick={() => send({ type: 'back' })} data-testid="button-back"><ArrowLeft size={17} /></button>
-              <button type="button" className="icon-button" aria-label="Go forward" title="Forward" disabled={!connected} onClick={() => send({ type: 'forward' })} data-testid="button-forward"><ArrowRight size={17} /></button>
-              <button type="button" className="icon-button" aria-label="Reload page" title="Reload" disabled={!connected} onClick={() => { setRemoteState('loading'); send({ type: 'reload' }); }} data-testid="button-reload"><RotateCw size={16} className={remoteState === 'loading' ? 'turning' : ''} /></button>
-            </div>
             <form className="address-form" onSubmit={submit} aria-label="Navigate to website">
               <LockKeyhole size={14} className="address-lock" aria-hidden="true" />
               <input
@@ -319,12 +315,25 @@ export default function Home() {
               {address && <button type="button" className="clear-address" aria-label="Clear address" data-testid="button-clear-url" onClick={() => { setAddress(''); setAddressError(''); }}><X size={14} /></button>}
               <button className="go-button" type="submit" aria-label="Navigate" data-testid="button-navigate"><ArrowRight size={16} /></button>
             </form>
-            <SiteChat />
-            <ActivitySettings />
-            <TabDisguise />
-            <PetSidebar />
-            <Link href="/owner" className="icon-button owner-link" aria-label="Owner dashboard" title="Owner dashboard" data-testid="link-owner"><UserCog size={16} /></Link>
-            <button type="button" className="icon-button" aria-label="Maximize display" title="Maximize display" onClick={() => setMaximized(true)} data-testid="button-maximize"><Maximize2 size={17} /></button>
+          </div>
+          <BrowserTools>
+            <section className="tools-section" aria-label="Navigation">
+              <h3>Navigation</h3>
+              <button type="button" className="icon-button" aria-label="Go back" disabled={!connected} onClick={() => send({ type: 'back' })} data-testid="button-back"><ArrowLeft size={17} /><span>Go back</span></button>
+              <button type="button" className="icon-button" aria-label="Go forward" disabled={!connected} onClick={() => send({ type: 'forward' })} data-testid="button-forward"><ArrowRight size={17} /><span>Go forward</span></button>
+              <button type="button" className="icon-button" aria-label="Reload page" disabled={!connected} onClick={() => { setRemoteState('loading'); send({ type: 'reload' }); }} data-testid="button-reload"><RotateCw size={16} className={remoteState === 'loading' ? 'turning' : ''} /><span>Reload page</span></button>
+              {frame?.url && <a href={frame.url} target="_blank" rel="noreferrer" className="icon-button" aria-label="Open address in local browser" data-testid="link-open-page"><ExternalLink size={16} /><span>Open in local browser</span></a>}
+            </section>
+            <section className="tools-section" aria-label="Workspace">
+              <h3>Workspace</h3>
+              <SiteChat />
+              <TabDisguise />
+              <button type="button" className="icon-button" aria-label={maximized ? 'Restore display' : 'Maximize display'} onClick={() => setMaximized(value => !value)} data-testid="button-maximize">{maximized ? <Minimize2 size={17} /> : <Maximize2 size={17} />}<span>{maximized ? 'Restore display' : 'Maximize display'}</span></button>
+            </section>
+            <section className="tools-section" aria-label="Session and settings">
+              <h3>Session &amp; settings</h3>
+              <ActivitySettings />
+              <Link href="/owner" className="icon-button owner-link" aria-label="Owner dashboard" data-testid="link-owner"><UserCog size={16} /><span>Owner dashboard</span></Link>
             <button
               type="button"
               className="icon-button clear-profile-button"
@@ -334,12 +343,14 @@ export default function Home() {
               onClick={clearSavedProfile}
               data-testid="button-clear-profile"
             >
-              <Trash2 size={15} />
+              <Trash2 size={15} /><span>Clear saved site data</span>
             </button>
             <button type="button" className="new-session-button" onClick={() => { closeSession(); window.setTimeout(() => document.querySelector<HTMLInputElement>('[data-testid="input-target-url"]')?.focus(), 0); }} data-testid="button-new-session">
               <span className="new-session-plus">+</span><span className="new-session-label">New session</span>
             </button>
-          </div>
+            </section>
+          </BrowserTools>
+          <PetSidebar />
           {(addressError || socketError) && (
             <div className="inline-alert" role="alert" data-testid={addressError ? 'text-address-error' : 'status-browser-error'}>
               <AlertCircle size={14} /><span>{addressError || socketError}</span>
@@ -359,7 +370,6 @@ export default function Home() {
                   <span>{profileLabel}</span>
                 </span>
                 {frame && <span className={`http-status ${frame.status >= 400 ? 'http-bad' : ''}`} data-testid="status-http">{frame.status}</span>}
-                {frame?.url && <a href={frame.url} target="_blank" rel="noreferrer" className="open-external" title="Open this address in your local browser" aria-label="Open address in local browser" data-testid="link-open-page"><ExternalLink size={14} /></a>}
               </div>
             </div>
 
@@ -383,17 +393,6 @@ export default function Home() {
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
             >
-              {maximized && (
-                <button type="button" className="restore-display" data-local-control
-                  aria-label="Restore display" title="Restore display (Escape)" data-testid="button-restore"
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onPointerMove={(event) => event.stopPropagation()}
-                  onPointerUp={(event) => event.stopPropagation()}
-                  onKeyDown={(event) => event.stopPropagation()}
-                  onClick={() => { setMaximized(false); viewportRef.current?.focus(); }}>
-                  <Minimize2 size={16} /><span>Restore</span>
-                </button>
-              )}
               {frame?.scroll?.canScroll && (
                 <input type="range" min="0" max="1000" step="1"
                   className="page-scrollbar" data-local-control data-testid="page-scrollbar"

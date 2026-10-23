@@ -61,3 +61,49 @@
   .pet-drawer, .pet-critter, .pet-z, .pet-spark { animation: none !important; }
   .pet-action { transition: none; }
 }
+.pet-drawer { z-index: 55; }
+.roam-layer { position: fixed; inset: 0; z-index: 35; pointer-events: none; overflow: hidden; }
+.roam-pet { position: absolute; left: 0; top: 0; width: 56px; height: 56px; padding: 0; border: 0; background: transparent; cursor: grab; pointer-events: auto; touch-action: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+.roam-pet.is-walking { transition: transform 2.4s cubic-bezier(.45,.05,.4,1); }
+.roam-pet.is-dragging { transition: none; cursor: grabbing; }
+.roam-pet:focus-visible { outline: 2px solid #b76845; outline-offset: 3px; border-radius: 50%; }
+.roam-body { display: block; width: 56px; height: 49px; margin-top: 4px; transform: scaleX(var(--face, 1)); transition: transform .2s; filter: drop-shadow(0 3px 4px rgba(40,54,53,.22)); }
+.roam-bob { transform-origin: 32px 46px; animation: pet-bob 3.2s ease-in-out infinite; }
+.roam-pet:hover .roam-bob, .roam-pet:focus-visible .roam-bob { animation: roam-wiggle .5s ease-in-out infinite; }
+.roam-pet.is-walking .roam-bob { animation: roam-trot .32s ease-in-out infinite; }
+.roam-pet.is-walking .roam-foot.a { animation: roam-step .32s infinite; }
+.roam-pet.is-walking .roam-foot.b { animation: roam-step .32s .16s infinite; }
+.roam-pet.is-dragging .roam-bob { animation: none; transform: rotate(-8deg) translateY(-4px); }
+.roam-pet.mood-sleepy .roam-bob { animation: pet-breathe 4s ease-in-out infinite; }
+.roam-shadow { position: absolute; left: 10px; right: 10px; bottom: 2px; height: 6px; border-radius: 50%; background: rgba(41,59,61,.18); }
+.roam-tag { position: absolute; left: 50%; bottom: 100%; transform: translate(-50%, 4px); padding: 2px 7px; border-radius: 99px; background: #f7f6ee; border: 1px solid #d3dbcf; color: #315e51; font: 700 10px var(--app-font-sans); white-space: nowrap; opacity: 0; transition: opacity .15s, transform .15s; pointer-events: none; }
+.roam-pet:hover .roam-tag, .roam-pet:focus-visible .roam-tag, .roam-pet.is-open .roam-tag { opacity: 1; transform: translate(-50%, -2px); }
+@keyframes roam-wiggle { 25% { transform: rotate(-5deg); } 75% { transform: rotate(5deg); } }
+@keyframes roam-trot { 50% { transform: translateY(-3px); } }
+@keyframes roam-step { 50% { transform: translateY(-2px); } }
+.pet-habitat svg { cursor: pointer; }
+.pet-habitat.is-game svg { cursor: default; }
+.pet-chase { transition: transform .45s cubic-bezier(.3,1.4,.5,1); }
+.pet-heart { position: absolute; left: 50%; top: 34%; width: 14px; height: 14px; background: #c96a5a; transform: rotate(45deg); pointer-events: none; animation: heart-up .9s ease-out forwards; }
+.pet-heart::before, .pet-heart::after { content: ""; position: absolute; width: 14px; height: 14px; border-radius: 50%; background: inherit; }
+.pet-heart::before { left: -7px; } .pet-heart::after { top: -7px; }
+.pet-heart.is-idle { display: none; }
+@keyframes heart-up { from { opacity: 1; transform: translate(-50%, 0) rotate(45deg) scale(.6); } to { opacity: 0; transform: translate(-50%, -40px) rotate(45deg) scale(1.1); } }
+.pet-acorn { position: absolute; width: 36px; height: 40px; margin: -20px 0 0 -18px; padding: 6px; border: 0; border-radius: 50%; background: rgba(247,246,238,.55); cursor: pointer; animation: acorn-pop .35s cubic-bezier(.3,1.6,.5,1); }
+.pet-acorn svg { width: 100%; height: 100%; }
+.pet-acorn:hover { background: rgba(247,246,238,.9); }
+.pet-acorn:focus-visible { outline: 2px solid #b76845; }
+@keyframes acorn-pop { from { transform: scale(.2); } }
+.pet-scoreboard { position: absolute; left: 8px; right: 8px; top: 8px; display: flex; justify-content: space-between; font: 700 10px var(--app-font-mono); color: #315e51; pointer-events: none; }
+.pet-scoreboard span { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 99px; background: #f7f6ee; }
+.pet-game-row { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.pet-small-btn.is-game { background: #315e51; border-color: #315e51; color: #f3f1e8; }
+.pet-small-btn.is-game:hover { background: #285d54; }
+.pet-small-btn:disabled { opacity: .5; cursor: default; }
+.pet-best { margin-left: auto; font: 10px var(--app-font-mono); color: #a86643; }
+.pet-hint { margin: 6px 0 0; font-size: 10px; line-height: 1.5; color: #72807c; }
+@media (prefers-reduced-motion: reduce) {
+  .roam-pet, .roam-body, .pet-chase { transition: none !important; }
+  .roam-bob, .roam-foot, .pet-heart, .pet-acorn { animation: none !important; }
+  .pet-heart { opacity: 0; }
+}
