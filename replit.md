@@ -40,8 +40,9 @@ Open public websites in server-side Chromium, interact with a live browser strea
 
 - The tab disguise controls the tab title and favicon across all routes. Owner dashboard and sign-in pages must not override the visitor's chosen appearance. This does not disguise the URL, browser history, or recorded activity.
 - Disguise presets are New Tab, Word document and Clever, using the supplied brand icons. Retired Notes/Calculator presets migrate without replacing custom titles.
-- The pet companion is saved locally in the visitor's browser; pet state is not uploaded or added to activity logs. Required site activity logging still applies independently.
-- The pet is opened by clicking its roaming avatar, not a toolbar icon. The address bar stays at the top; navigation, chat, disguise and session/settings controls live in the expandable right-edge tools panel.
+- The pet companion, selected look, tucked-away state and movable bed position are saved locally in the visitor's browser; pet state is not uploaded or added to activity logs. Required site activity logging still applies independently.
+- The pet avatar is smaller and can be a hedgehog, fox, bunny or frog. Visitors can drag it into its movable bed to pause roaming, or click the bed to tuck it in and let it back out.
+- Keep browser back/forward/reload, chat and address controls in the top bar. The remaining workspace, disguise and session/settings controls live in the expandable right-edge tools panel.
 - Visit-log text downloads are newest-first. Chat-log text downloads retain their existing chronological order.
 
 ## Architecture decisions

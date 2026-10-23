@@ -152,7 +152,9 @@
   border-radius: 14px;
   box-shadow: 0 16px 42px rgba(42,56,53,.12), 0 2px 5px rgba(42,56,53,.05);
 }
-.toolbar { display: flex; align-items: center; gap: 10px; min-height: 42px; margin-bottom: 10px; }
+.toolbar { display: flex; align-items: center; gap: 6px; min-width: 0; min-height: 42px; margin-bottom: 10px; }
+.toolbar-navigation { display: flex; flex: none; align-items: center; gap: 2px; }
+.toolbar .icon-button { flex: none; width: 32px; height: 32px; }
 .history-controls { display: flex; gap: 3px; }
 .icon-button {
   width: 31px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 8px;
@@ -176,6 +178,12 @@
 .go-button { color: #f5f2e8; background: #38675d; transition: background .15s, transform .15s; }
 .go-button:hover { background: #29574e; }
 .go-button:active { transform: translateX(1px); }
+@media (max-width: 640px) {
+  .toolbar { gap: 4px; }
+  .toolbar-navigation { gap: 0; }
+  .toolbar .icon-button { width: 29px; height: 32px; }
+  .address-form { gap: 5px; padding-left: 8px; }
+}
 .new-session-button {
   display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 35px; padding: 0 11px;
   border: 1px solid #d7d9d0; border-radius: 8px; color: #60716d; background: transparent;

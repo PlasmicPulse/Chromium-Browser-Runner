@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Bath, Carrot, Hand, Moon, Pencil, Sparkles, Timer, X } from "lucide-react";
+import { Bath, BedDouble, Carrot, Hand, Moon, Pencil, Sparkles, Timer, X } from "lucide-react";
 import { RoamingPet } from "./roaming-pet";
+import { PET_APPEARANCES, PetSprite } from "./pet-appearance";
 import "./pet-sidebar.css";
 import { apply, applyGame, applyPetting, decay, load, mood, sanitizeName, save, type PetAction, type PetState } from "./pet-state";
 
@@ -27,21 +28,9 @@ function Habitat({ pet, moodKey, dx = 0, onPet }: { pet: PetState; moodKey: stri
       {!sleeping && moodKey === "joy" && (
         <g fill="#c98a52"><circle className="pet-spark" cx="108" cy="92" r="3" /><circle className="pet-spark" cx="214" cy="84" r="2.5" /></g>
       )}
-      <g className="pet-chase" style={{ transform: `translateX(${dx}px)` }}><g className="pet-critter">
-        <path d="M104 186 Q100 108 160 102 Q222 106 216 186Z" fill="#567c6c" />
-        <g fill="#3f6556">{[0,1,2,3,4,5,6].map((i) => <path key={i} d={`M${112 + i * 15} ${120 - Math.abs(3 - i) * -2} l7 -14 l7 14z`} />)}</g>
-        <ellipse cx="160" cy="160" rx="42" ry="32" fill="#f2e6cf" />
-        <circle cx="136" cy="168" r="7" fill="#e9a990" opacity=".55" /><circle cx="184" cy="168" r="7" fill="#e9a990" opacity=".55" />
-        {sleeping ? (
-          <g stroke="#293b3d" strokeWidth="3" strokeLinecap="round" fill="none"><path d="M138 152 q6 5 12 0" /><path d="M170 152 q6 5 12 0" /></g>
-        ) : (
-          <g fill="#293b3d"><circle cx="144" cy="152" r="5" /><circle cx="176" cy="152" r="5" /><circle cx="146" cy="150" r="1.6" fill="#fff8ec" /><circle cx="178" cy="150" r="1.6" fill="#fff8ec" /></g>
-        )}
-        <ellipse cx="160" cy="163" rx="4" ry="3" fill="#b76845" />
-        <path d={moodKey === "joy" ? "M150 171 q10 9 20 0" : moodKey === "calm" || sleeping ? "M153 172 q7 4 14 0" : "M153 175 q7 -4 14 0"} stroke="#293b3d" strokeWidth="2.4" fill="none" strokeLinecap="round" />
-        <ellipse cx="130" cy="188" rx="10" ry="6" fill="#3f6556" /><ellipse cx="190" cy="188" rx="10" ry="6" fill="#3f6556" />
-        {messy && <g fill="#8a6a4a"><circle cx="122" cy="140" r="4" /><circle cx="198" cy="134" r="3" /><path d="M176 112 l10 -4 l-2 8z" /></g>}
-      </g></g>
+      <svg x="96" y="100" width="128" height="112" viewBox="0 0 64 56" className="pet-chase" style={{ transform: `translateX(${dx}px)` }} aria-hidden="true">
+        <PetSprite appearance={pet.appearance} sleepy={sleeping} className="pet-critter" />
+      </svg>
       {sleeping && <text className="pet-z" x="212" y="104" fill="#5d706c" fontSize="18" fontWeight="800">z</text>}
     </svg>
   );
@@ -142,12 +131,29 @@ export function PetSidebar() {
     react(msg);
   };
 
+  const toggleBed = () => {
+    const tucked = !pet.tuckedAway;
+    if (tucked) setGame((g) => g.on ? { ...g, on: false, left: 0, best: Math.max(g.best, g.score) } : g);
+    update((p) => ({ ...p, tuckedAway: !p.tuckedAway }));
+    react(tucked ? `${pet.name} is tucked in. The roaming has paused.` : `${pet.name} is back out exploring.`);
+  };
+
   const m = mood(pet);
   const meters: [keyof PetState, string][] = [["hunger", "Fullness"], ["happiness", "Happiness"], ["energy", "Energy"], ["hygiene", "Tidiness"]];
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen} modal={false}>
-      <RoamingPet ref={avatarRef} name={pet.name} moodKey={m.key} open={open} onOpen={() => setOpen(true)} />
+      <RoamingPet
+        ref={avatarRef}
+        name={pet.name}
+        moodKey={m.key}
+        appearance={pet.appearance}
+        tucked={pet.tuckedAway}
+        open={open}
+        onOpen={() => setOpen(true)}
+        onToggleTucked={toggleBed}
+        onDropInBed={() => update((p) => ({ ...p, tuckedAway: true }))}
+      />
       <Dialog.Portal>
         <Dialog.Content
           className={`pet-drawer mood-${m.key}${bounce ? " pet-bounce" : ""}`}
@@ -186,6 +192,22 @@ export function PetSidebar() {
               {game.best > 0 && <span className="pet-best" data-testid="text-pet-best">Best {game.best}</span>}
             </div>
             <p className="pet-hint">Tap {pet.name} in the hollow to pet. In Acorn chase, tap or press Enter on each acorn within 15 seconds; every catch lifts happiness and energy.</p>
+            <div className="pet-looks" role="group" aria-label="Choose your pet's look" data-testid="group-pet-appearances">
+              {PET_APPEARANCES.map((look) => (
+                <button
+                  key={look.id}
+                  type="button"
+                  className={`pet-look${pet.appearance === look.id ? " is-selected" : ""}`}
+                  aria-label={`Choose ${look.label}`}
+                  aria-pressed={pet.appearance === look.id}
+                  onClick={() => { update((p) => ({ ...p, appearance: look.id })); react(`${pet.name} looks like a ${look.label.toLowerCase()} now.`); }}
+                  data-testid={`button-pet-look-${look.id}`}
+                >
+                  <PetSprite appearance={look.id} className="pet-look-sprite" />
+                  <span>{look.label}</span>
+                </button>
+              ))}
+            </div>
             <div className="pet-nameplate">
               <span className="pet-name" data-testid="text-pet-name">{pet.name}</span>
               <span className="pet-mood-chip" data-testid="status-pet-mood">{m.label}</span>
@@ -218,6 +240,7 @@ export function PetSidebar() {
               <button type="button" className="pet-action" onClick={() => act("play")} data-testid="button-pet-play"><Sparkles size={15} /> Play</button>
               <button type="button" className="pet-action" aria-pressed={pet.resting} onClick={() => act("rest")} data-testid="button-pet-rest"><Moon size={15} /> {pet.resting ? "Wake" : "Rest"}</button>
               <button type="button" className="pet-action" onClick={() => act("clean")} data-testid="button-pet-clean"><Bath size={15} /> Clean</button>
+              <button type="button" className="pet-action pet-action-bed" aria-pressed={pet.tuckedAway} onClick={toggleBed} data-testid="button-pet-tuck"><BedDouble size={15} /> {pet.tuckedAway ? "Let wander" : "Tuck into bed"}</button>
             </div>
             <p className="pet-note" data-testid="text-pet-storage">
               {stored

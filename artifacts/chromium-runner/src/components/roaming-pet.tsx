@@ -1,8 +1,13 @@
 import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
+import { BedDouble } from "lucide-react";
+import { PET_APPEARANCES, PetSprite, type PetAppearance } from "./pet-appearance";
 
-const SIZE = 56;
-// Keep clear of the address bar (top), the right tools toggle and bottom controls.
+const SIZE = 44;
+const BED_SIZE = { width: 88, height: 64 };
+const BED_KEY = "pet-bed-position:v1";
+// Keep clear of the address bar, the right tools toggle and bottom controls.
 const PAD = { top: 76, right: 72, bottom: 92, left: 12 };
+type Position = { x: number; y: number };
 const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
 function bounds() {
@@ -13,23 +18,73 @@ function bounds() {
   const maxY = Math.max(minY, h - PAD.bottom - SIZE);
   return { minX, minY, maxX, maxY };
 }
-const clampPos = (x: number, y: number) => {
+const clampPos = (x: number, y: number): Position => {
   const b = bounds();
   return { x: Math.min(b.maxX, Math.max(b.minX, x)), y: Math.min(b.maxY, Math.max(b.minY, y)) };
 };
 
-type Props = { name: string; moodKey: string; open: boolean; onOpen: () => void };
+function clampBed(x: number, y: number): Position {
+  return {
+    x: Math.min(Math.max(8, window.innerWidth - BED_SIZE.width - 8), Math.max(8, x)),
+    y: Math.min(Math.max(70, window.innerHeight - BED_SIZE.height - 52), Math.max(70, y)),
+  };
+}
 
-export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingPet({ name, moodKey, open, onOpen }, ref) {
-  const [pos, setPos] = useState(() => (typeof window === "undefined" ? { x: 16, y: 120 } : clampPos(window.innerWidth - PAD.right - SIZE - 24, window.innerHeight - PAD.bottom - SIZE)));
+function readBed(): Position {
+  if (typeof window === "undefined") return { x: 16, y: 120 };
+  try {
+    const raw = localStorage.getItem(BED_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<Position>;
+      if (typeof parsed.x === "number" && Number.isFinite(parsed.x) && typeof parsed.y === "number" && Number.isFinite(parsed.y)) {
+        return clampBed(parsed.x, parsed.y);
+      }
+    }
+  } catch { /* Use the default when browser storage is unavailable or corrupt. */ }
+  return clampBed(window.innerWidth - BED_SIZE.width - 64, window.innerHeight - BED_SIZE.height - 78);
+}
+
+function bedDock(bed: Position): Position {
+  return clampPos(bed.x + 21, bed.y + 10);
+}
+
+type Props = {
+  name: string;
+  moodKey: string;
+  appearance: PetAppearance;
+  tucked: boolean;
+  open: boolean;
+  onOpen: () => void;
+  onToggleTucked: () => void;
+  onDropInBed: () => void;
+};
+
+export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingPet(
+  { name, moodKey, appearance, tucked, open, onOpen, onToggleTucked, onDropInBed }, ref,
+) {
+  const [bedPos, setBedPos] = useState<Position>(readBed);
+  const bedPosRef = useRef(bedPos);
+  bedPosRef.current = bedPos;
+  const bedRef = useRef<HTMLButtonElement>(null);
+  const [pos, setPos] = useState(() => (typeof window === "undefined" ? { x: 16, y: 120 } : clampPos(window.innerWidth * 0.57, window.innerHeight * 0.45)));
   const [face, setFace] = useState(1);
   const [hover, setHover] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [bedDragging, setBedDragging] = useState(false);
   const [reduced, setReduced] = useState(() => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
   const [walking, setWalking] = useState(false);
   const drag = useRef<{ id: number; sx: number; sy: number; ox: number; oy: number; moved: boolean } | null>(null);
+  const bedDrag = useRef<{ id: number; sx: number; sy: number; ox: number; oy: number; moved: boolean } | null>(null);
   const suppressClick = useRef(false);
+  const suppressBedClick = useRef(false);
   const posRef = useRef(pos); posRef.current = pos;
+
+  const setBed = useCallback((next: Position) => {
+    const safe = clampBed(next.x, next.y);
+    bedPosRef.current = safe;
+    setBedPos(safe);
+    try { localStorage.setItem(BED_KEY, JSON.stringify(safe)); } catch { /* The bed remains movable for this session. */ }
+  }, []);
 
   useEffect(() => {
     const mq = window.matchMedia?.("(prefers-reduced-motion: reduce)");
@@ -40,13 +95,19 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
   }, []);
 
   useEffect(() => {
-    const fn = () => setPos((p) => clampPos(p.x, p.y));
+    const fn = () => {
+      const nextBed = clampBed(bedPosRef.current.x, bedPosRef.current.y);
+      setBed(nextBed);
+      setPos((current) => tucked ? bedDock(nextBed) : clampPos(current.x, current.y));
+    };
     window.addEventListener("resize", fn);
     window.visualViewport?.addEventListener("resize", fn);
     return () => { window.removeEventListener("resize", fn); window.visualViewport?.removeEventListener("resize", fn); };
-  }, []);
+  }, [setBed, tucked]);
 
-  const paused = hover || dragging || open || reduced || moodKey === "sleepy";
+  useEffect(() => { if (tucked) setPos(bedDock(bedPos)); }, [bedPos, tucked]);
+
+  const paused = hover || dragging || open || reduced || tucked || moodKey === "sleepy";
   useEffect(() => {
     if (paused) { setWalking(false); return; }
     let stopT: number | undefined;
@@ -87,20 +148,78 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
     const d = drag.current;
     if (!d || d.id !== e.pointerId) return;
     e.stopPropagation();
+    const next = clampPos(d.ox + e.clientX - d.sx, d.oy + e.clientY - d.sy);
+    const target = bedRef.current?.getBoundingClientRect();
+    const centerX = next.x + SIZE / 2, centerY = next.y + SIZE / 2;
+    const droppedInBed = d.moved && !!target
+      && centerX >= target.left + 5 && centerX <= target.right - 5
+      && centerY >= target.top + 5 && centerY <= target.bottom - 5;
+    setPos(droppedInBed ? bedDock(bedPosRef.current) : next);
     suppressClick.current = d.moved;
     drag.current = null;
     setDragging(false);
-  }, []);
+    if (droppedInBed) onDropInBed();
+  }, [onDropInBed]);
 
+  const bedPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    if (e.button !== 0) return;
+    bedDrag.current = { id: e.pointerId, sx: e.clientX, sy: e.clientY, ox: bedPosRef.current.x, oy: bedPosRef.current.y, moved: false };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
+  const bedPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const d = bedDrag.current;
+    if (!d || d.id !== e.pointerId) return;
+    e.stopPropagation();
+    const mx = e.clientX - d.sx, my = e.clientY - d.sy;
+    if (!d.moved && Math.hypot(mx, my) < 6) return;
+    if (!d.moved) { d.moved = true; setBedDragging(true); }
+    setBed({ x: d.ox + mx, y: d.oy + my });
+  };
+  const endBedDrag = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const d = bedDrag.current;
+    if (!d || d.id !== e.pointerId) return;
+    e.stopPropagation();
+    suppressBedClick.current = d.moved;
+    bedDrag.current = null;
+    setBedDragging(false);
+  };
+
+  const lookLabel = PET_APPEARANCES.find((choice) => choice.id === appearance)?.label ?? "pet";
   return (
     <div className="roam-layer" data-testid="layer-pet-roam">
-      <span id="roam-pet-help" className="pet-live">Press Enter or Space, or tap, to open {name}'s care panel. Drag to move {name} around the screen.</span>
+      <span id="roam-pet-help" className="pet-live">Press Enter or Space, or tap, to open {name}'s care panel. Drag to move {name}. Click the bed or drag {name} into it to stop wandering.</span>
+      <button
+        ref={bedRef}
+        type="button"
+        className={`pet-bed${bedDragging ? " is-dragging" : ""}${tucked ? " has-visitor" : ""}`}
+        style={{ transform: `translate3d(${bedPos.x}px, ${bedPos.y}px, 0)` }}
+        aria-label={tucked ? `Let ${name} out of bed` : `Tuck ${name} into bed`}
+        aria-pressed={tucked}
+        title="Drag to move the bed; click to tuck the pet in or let them wander."
+        data-testid="button-pet-bed"
+        onPointerDown={bedPointerDown}
+        onPointerMove={bedPointerMove}
+        onPointerUp={endBedDrag}
+        onPointerCancel={endBedDrag}
+        onMouseDown={stop} onTouchStart={stop} onKeyDown={stop} onKeyUp={stop}
+        onClick={(e) => { e.stopPropagation(); const ignore = suppressBedClick.current && e.detail > 0; suppressBedClick.current = false; if (!ignore) onToggleTucked(); }}
+      >
+        <svg viewBox="0 0 88 64" aria-hidden="true" focusable="false">
+          <path d="M7 55V21q0-7 8-7h58q8 0 8 7v34" fill="#d5c5a7" stroke="#876b50" strokeWidth="3" strokeLinejoin="round" />
+          <path d="M13 32q0-7 8-7h46q8 0 8 7v13H13Z" fill="#ede7d6" stroke="#b39a78" strokeWidth="2" />
+          <path d="M17 42q6-13 17-8l8 8m-22 5h43q7 0 9 8H15q0-8 2-8Z" fill="#91aa93" stroke="#64816c" strokeWidth="2" strokeLinejoin="round" />
+          <path d="M7 49h8m58 0h8" stroke="#876b50" strokeWidth="4" strokeLinecap="round" />
+          <path d="M22 35q4-5 9-1" stroke="#f7f6ee" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+        <span className="pet-bed-caption"><BedDouble size={11} /> {tucked ? "Tucked in" : "Bed"}</span>
+      </button>
       <button
         ref={ref}
         type="button"
-        className={`roam-pet mood-${moodKey}${walking ? " is-walking" : ""}${dragging ? " is-dragging" : ""}${open ? " is-open" : ""}`}
-        style={{ transform: `translate3d(${pos.x}px, ${pos.y}px, 0)` }}
-        aria-label={`${name} the moss-hedgehog. Open care panel`}
+        className={`roam-pet mood-${moodKey}${walking ? " is-walking" : ""}${dragging ? " is-dragging" : ""}${open ? " is-open" : ""}${tucked ? " is-tucked" : ""}`}
+        style={{ transform: `translate3d(${tucked ? bedDock(bedPos).x : pos.x}px, ${tucked ? bedDock(bedPos).y : pos.y}px, 0)` }}
+        aria-label={`${name}, a ${lookLabel}, ${tucked ? "tucked in bed" : "exploring"}. Click to open the care panel`}
         aria-describedby="roam-pet-help"
         aria-expanded={open}
         title={`${name} - click to care, drag to move`}
@@ -123,18 +242,10 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
         onClick={(e) => { e.stopPropagation(); const ignore = suppressClick.current && e.detail > 0; suppressClick.current = false; if (!ignore) onOpen(); }}
       >
         <span className="roam-shadow" aria-hidden="true" />
-        <svg className="roam-body" viewBox="0 0 64 56" aria-hidden="true" style={{ ["--face" as string]: face }}>
-          <g className="roam-bob">
-            <path d="M6 44 Q4 14 30 10 Q52 10 56 36 L58 44Z" fill="#567c6c" />
-            <g fill="#3f6556"><path d="M10 26 l4 -9 l4 9z" /><path d="M18 18 l4 -9 l4 9z" /><path d="M27 15 l4 -9 l4 9z" /><path d="M36 16 l4 -8 l4 9z" /></g>
-            <path d="M34 44 Q36 22 50 24 Q62 28 60 40 Q56 46 34 44Z" fill="#f2e6cf" />
-            <circle cx="62" cy="36" r="2.4" fill="#b76845" />
-            {moodKey === "sleepy" ? <path d="M48 32 q3 2 6 0" stroke="#293b3d" strokeWidth="1.8" fill="none" strokeLinecap="round" /> : <><circle cx="51" cy="31" r="2.6" fill="#293b3d" /><circle cx="52" cy="30" r=".9" fill="#fff8ec" /></>}
-            <circle cx="46" cy="38" r="3" fill="#e9a990" opacity=".6" />
-            <ellipse className="roam-foot a" cx="18" cy="46" rx="5" ry="3" fill="#3f6556" />
-            <ellipse className="roam-foot b" cx="44" cy="46" rx="5" ry="3" fill="#3f6556" />
-          </g>
-        </svg>
+        <span className="roam-body" style={{ transform: `scaleX(${face})` }}>
+          <PetSprite appearance={appearance} sleepy={tucked || moodKey === "sleepy"} className="roam-svg" />
+        </span>
+        {tucked && <span className="roam-z" aria-hidden="true">z</span>}
         <span className="roam-tag" aria-hidden="true">{name}</span>
       </button>
     </div>

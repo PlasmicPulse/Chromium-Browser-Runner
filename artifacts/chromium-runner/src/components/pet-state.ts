@@ -1,5 +1,7 @@
+import { isPetAppearance, type PetAppearance } from "./pet-appearance";
+
 export type PetStats = { hunger: number; happiness: number; energy: number; hygiene: number };
-export type PetState = PetStats & { version: 1; name: string; updatedAt: number; resting: boolean };
+export type PetState = PetStats & { version: 1; name: string; updatedAt: number; resting: boolean; appearance: PetAppearance; tuckedAway: boolean };
 export type PetAction = "feed" | "play" | "rest" | "clean";
 
 export const PET_KEY = "pet-companion:v1";
@@ -11,7 +13,7 @@ const FLOOR = 8; // no death, stats never fully empty
 export const clamp = (n: number) => Math.min(100, Math.max(FLOOR, n));
 
 export function defaultPet(now = Date.now()): PetState {
-  return { version: 1, name: "Pip", hunger: 78, happiness: 82, energy: 71, hygiene: 86, updatedAt: now, resting: false };
+  return { version: 1, name: "Pip", hunger: 78, happiness: 82, energy: 71, hygiene: 86, updatedAt: now, resting: false, appearance: "hedgehog", tuckedAway: false };
 }
 
 export function sanitizeName(s: unknown): string {
@@ -38,6 +40,8 @@ export function validate(raw: unknown, now = Date.now()): PetState {
     hygiene: num(r.hygiene, d.hygiene),
     updatedAt: t,
     resting: r.resting === true,
+    appearance: isPetAppearance(r.appearance) ? r.appearance : d.appearance,
+    tuckedAway: r.tuckedAway === true,
   };
 }
 
