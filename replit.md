@@ -43,6 +43,7 @@ Open public websites in server-side Chromium, interact with a live browser strea
 - The pet companion, selected look, room background, furniture choices and positions, tucked-away state and movable bed position are saved locally in the visitor's browser; pet state is not uploaded or added to activity logs. Required site activity logging still applies independently.
 - The pet avatar can be a hedgehog, fox, bunny, frog, shark, Kenny, SpongeBob, Patrick or Plankton. Visitors can drag it into its movable bed to pause roaming, or click the bed to tuck it in and let it back out.
 - Visitors can choose a pet-room background and add/remove six decor items. The search/address bar color is also customizable and saved locally in that browser.
+- Bookmarks are stored locally in the visitor's browser; saving the current page is controlled from the address bar, and saved pages are opened or removed from the Browser tools panel.
 - Keep browser back/forward/reload, chat and address controls in the top bar. The remaining workspace, disguise and session/settings controls live in the expandable right-edge tools panel.
 - Visit-log text downloads are newest-first. Chat-log text downloads retain their existing chronological order.
 

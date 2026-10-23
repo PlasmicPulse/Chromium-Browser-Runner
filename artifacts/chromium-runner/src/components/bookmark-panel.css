@@ -1,0 +1,15 @@
+.bookmark-panel { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.bookmarks-note { margin: 0 2px; color: #728078; font-size: 10px; line-height: 1.5; }
+.bookmarks-empty { margin: 0; padding: 10px 11px; border: 1px dashed #ccd7cb; border-radius: 9px; color: #697970; font-size: 11px; line-height: 1.55; }
+.bookmarks-list { display: flex; flex-direction: column; gap: 5px; padding: 0; margin: 0; list-style: none; }
+.bookmark-row { display: flex; align-items: stretch; gap: 3px; min-width: 0; padding: 3px; border: 1px solid #e0e5dc; border-radius: 9px; background: #fbfcf7; }
+.bookmark-open { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 5px; border: 0; border-radius: 6px; background: transparent; color: #40564d; text-align: left; cursor: pointer; }
+.bookmark-open:hover { background: #eaf0e8; }
+.bookmark-copy { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
+.bookmark-copy strong, .bookmark-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bookmark-copy strong { color: #344b42; font-size: 11px; font-weight: 700; }
+.bookmark-copy small { color: #78867f; font: 9px var(--app-font-mono); }
+.bookmark-external { flex: none; color: #829087; }
+.bookmark-remove { display: grid; flex: none; place-items: center; width: 32px; min-height: 36px; border: 0; border-radius: 6px; background: transparent; color: #8b746f; cursor: pointer; }
+.bookmark-remove:hover { color: #9e4f45; background: #f8e9e4; }
+.bookmark-open:focus-visible, .bookmark-remove:focus-visible { outline: 2px solid #426e60; outline-offset: 1px; }

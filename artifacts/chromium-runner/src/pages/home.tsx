@@ -8,8 +8,10 @@ import { ActivitySettings } from '@/components/activity-settings';
 import { TabDisguise } from '@/components/tab-disguise';
 import { PetSidebar } from '@/components/pet-sidebar';
 import { BrowserTools } from '@/components/browser-tools';
+import { BookmarkPanel } from '@/components/bookmark-panel';
+import { createBookmark, loadBookmarks, saveBookmarks, type Bookmark } from '@/components/bookmark-storage';
 import {
-  AlertCircle, ArrowLeft, ArrowRight, ExternalLink, Globe2, LoaderCircle,
+  AlertCircle, ArrowLeft, ArrowRight, Bookmark as BookmarkIcon, BookmarkCheck, ExternalLink, Globe2, LoaderCircle,
   LockKeyhole, Radio, RotateCw, ShieldCheck, Trash2, X, Maximize2, Minimize2, UserCog,
 } from 'lucide-react';
 
@@ -68,6 +70,7 @@ export default function Home() {
   trackingTokenRef.current = consent?.enabled ? consent.token : null;
   const [address, setAddress] = useState('');
   const [addressColor, setAddressColor] = useState(loadAddressColor);
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>(loadBookmarks);
   const [currentUrl, setCurrentUrl] = useState('');
   const [frame, setFrame] = useState<BrowserFrame | null>(null);
   const [remoteState, setRemoteState] = useState<RemoteState>('disconnected');
@@ -95,6 +98,43 @@ export default function Home() {
     if (!/^#[0-9a-f]{6}$/i.test(color)) return;
     setAddressColor(color);
     try { window.localStorage.setItem(ADDRESS_COLOR_KEY, color); } catch { /* Keep the selection for this session if storage is unavailable. */ }
+  }
+
+  function toggleCurrentBookmark() {
+    if (!frame?.url || remoteState !== 'ready') return;
+    const existing = bookmarks.find((bookmark) => bookmark.url === frame.url || bookmark.url === currentUrl);
+    let next: Bookmark[];
+    if (existing) {
+      next = bookmarks.filter((bookmark) => bookmark.id !== existing.id);
+    } else {
+      if (bookmarks.length >= 100) {
+        setNotice('You have 100 bookmarks. Remove one before saving another.');
+        return;
+      }
+      let fallbackTitle = frame.title;
+      try { fallbackTitle ||= new URL(frame.url).hostname; } catch { fallbackTitle ||= 'Saved page'; }
+      const bookmark = createBookmark(frame.url, fallbackTitle);
+      if (!bookmark) {
+        setNotice('This page could not be saved as a bookmark.');
+        return;
+      }
+      next = [bookmark, ...bookmarks];
+    }
+    setBookmarks(next);
+    if (!saveBookmarks(next)) setNotice('Bookmark storage is unavailable. It will be lost when this page closes.');
+  }
+
+  function openBookmark(url: string) {
+    const parsed = parseAddress(url);
+    if (!parsed) return;
+    if (connected && socketRef.current?.readyState === WebSocket.OPEN) navigateTo(parsed);
+    else startSession(parsed);
+  }
+
+  function removeBookmark(id: string) {
+    const next = bookmarks.filter((bookmark) => bookmark.id !== id);
+    setBookmarks(next);
+    if (!saveBookmarks(next)) setNotice('Bookmark storage is unavailable. This removal only applies for this session.');
   }
 
   useRemoteScroll(viewportRef, frame?.viewport ?? null, send);
@@ -349,6 +389,20 @@ export default function Home() {
                 spellCheck={false}
               />
               {address && <button type="button" className="clear-address" aria-label="Clear address" data-testid="button-clear-url" onClick={() => { setAddress(''); setAddressError(''); }}><X size={14} /></button>}
+              <button
+                type="button"
+                className={`bookmark-current${bookmarks.some((bookmark) => bookmark.url === frame?.url || bookmark.url === currentUrl) ? ' is-saved' : ''}`}
+                aria-label={bookmarks.some((bookmark) => bookmark.url === frame?.url || bookmark.url === currentUrl) ? 'Remove current page bookmark' : 'Bookmark current page'}
+                aria-pressed={bookmarks.some((bookmark) => bookmark.url === frame?.url || bookmark.url === currentUrl)}
+                title={bookmarks.some((bookmark) => bookmark.url === frame?.url || bookmark.url === currentUrl) ? 'Remove bookmark' : 'Bookmark this page'}
+                disabled={!frame?.url || remoteState !== 'ready'}
+                onClick={toggleCurrentBookmark}
+                data-testid="button-bookmark-current"
+              >
+                {bookmarks.some((bookmark) => bookmark.url === frame?.url || bookmark.url === currentUrl)
+                  ? <BookmarkCheck size={15} />
+                  : <BookmarkIcon size={15} />}
+              </button>
               <button className="go-button" type="submit" aria-label="Navigate" data-testid="button-navigate"><ArrowRight size={16} /></button>
             </form>
             <SiteChat />
@@ -358,6 +412,10 @@ export default function Home() {
               <h3>Workspace</h3>
               <TabDisguise />
               <button type="button" className="icon-button" aria-label={maximized ? 'Restore display' : 'Maximize display'} onClick={() => setMaximized(value => !value)} data-testid="button-maximize">{maximized ? <Minimize2 size={17} /> : <Maximize2 size={17} />}<span>{maximized ? 'Restore display' : 'Maximize display'}</span></button>
+            </section>
+            <section className="tools-section" aria-label="Bookmarks">
+              <h3>Bookmarks</h3>
+              <BookmarkPanel bookmarks={bookmarks} onOpen={openBookmark} onRemove={removeBookmark} />
             </section>
             <section className="tools-section" aria-label="Appearance">
               <h3>Appearance</h3>
