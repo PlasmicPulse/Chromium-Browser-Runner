@@ -638,7 +638,7 @@ async function handleMessage(
       case "key":
         if (
           !allowedKeys.has(message.key) &&
-          !/^(?:(?:Control|Alt|Meta|Shift)\+)*(?:[A-Za-z0-9]|Arrow(?:Down|Left|Right|Up)|F(?:[1-9]|1[0-2]))$/.test(message.key)
+          !/^(?:(?:Control|Alt|Meta|Shift)\+)*(?:[A-Za-z0-9]|Arrow(?:Down|Left|Right|Up)|F(?:[1-9]|1[0-2])|Enter)$/.test(message.key)
         ) {
           sendError(session, "That keyboard key is not supported.");
           return;
