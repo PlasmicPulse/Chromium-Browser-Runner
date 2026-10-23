@@ -23,6 +23,29 @@ export type PetFurniture = typeof PET_FURNITURE[number]["id"];
 export function isPetFurniture(value: unknown): value is PetFurniture {
   return PET_FURNITURE.some((item) => item.id === value);
 }
+export type PetFurniturePosition = { x: number; y: number };
+export const PET_FURNITURE_DEFAULT_POSITIONS: Record<PetFurniture, PetFurniturePosition> = {
+  plant: { x: 15, y: 71 },
+  bed: { x: 79, y: 79 },
+  toy: { x: 28, y: 83 },
+  lamp: { x: 88, y: 49 },
+  window: { x: 17, y: 23 },
+  bowl: { x: 88, y: 76 },
+};
+
+function normalizeFurniturePositions(value: unknown): Partial<Record<PetFurniture, PetFurniturePosition>> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const source = value as Record<string, unknown>;
+  const positions: Partial<Record<PetFurniture, PetFurniturePosition>> = {};
+  for (const item of PET_FURNITURE) {
+    const point = source[item.id];
+    if (!point || typeof point !== "object") continue;
+    const { x, y } = point as Record<string, unknown>;
+    if (typeof x !== "number" || !Number.isFinite(x) || typeof y !== "number" || !Number.isFinite(y)) continue;
+    positions[item.id] = { x: Math.max(9, Math.min(91, x)), y: Math.max(10, Math.min(90, y)) };
+  }
+  return positions;
+}
 
 export type PetStats = { hunger: number; happiness: number; energy: number; hygiene: number };
 export type PetState = PetStats & {
@@ -34,6 +57,7 @@ export type PetState = PetStats & {
   tuckedAway: boolean;
   roomBackground: PetRoomBackground;
   furniture: PetFurniture[];
+  furniturePositions: Partial<Record<PetFurniture, PetFurniturePosition>>;
 };
 export type PetAction = "feed" | "play" | "rest" | "clean";
 
@@ -49,7 +73,7 @@ export function defaultPet(now = Date.now()): PetState {
   return {
     version: 1, name: "Pip", hunger: 78, happiness: 82, energy: 71, hygiene: 86,
     updatedAt: now, resting: false, appearance: "hedgehog", tuckedAway: false,
-    roomBackground: "fern", furniture: [],
+    roomBackground: "fern", furniture: [], furniturePositions: {},
   };
 }
 
@@ -81,6 +105,7 @@ export function validate(raw: unknown, now = Date.now()): PetState {
     tuckedAway: r.tuckedAway === true,
     roomBackground: isPetRoomBackground(r.roomBackground) ? r.roomBackground : d.roomBackground,
     furniture: Array.isArray(r.furniture) ? [...new Set(r.furniture.filter(isPetFurniture))] : d.furniture,
+    furniturePositions: normalizeFurniturePositions(r.furniturePositions),
   };
 }
 

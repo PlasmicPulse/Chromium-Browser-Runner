@@ -6,6 +6,7 @@ import { PET_APPEARANCES, PetSprite } from "./pet-appearance";
 import "./pet-sidebar.css";
 import {
   PET_FURNITURE,
+  PET_FURNITURE_DEFAULT_POSITIONS,
   PET_ROOM_BACKGROUNDS,
   apply,
   applyGame,
@@ -17,11 +18,164 @@ import {
   save,
   type PetAction,
   type PetFurniture,
+  type PetFurniturePosition,
   type PetState,
 } from "./pet-state";
 
 const TICK_MS = 30_000;
 const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+
+function FurnitureArt({ item }: { item: PetFurniture }) {
+  return (
+    <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+      {item === "plant" && (
+        <>
+          <path d="M20 31Q8 19 14 10Q23 15 24 28Q25 11 37 8Q40 22 27 32Q37 23 43 28Q38 39 25 37Z" fill="#538766" />
+          <path d="M12 31H37L33 45H16Z" fill="#bd7959" /><path d="M16 34H34" stroke="#e7b18a" strokeWidth="2" />
+        </>
+      )}
+      {item === "bed" && (
+        <>
+          <rect x="3" y="16" width="42" height="24" rx="9" fill="#9c748a" />
+          <rect x="7" y="11" width="34" height="21" rx="8" fill="#e7b9c5" />
+          <ellipse cx="24" cy="25" rx="12" ry="6" fill="#f5e8df" />
+          <path d="M8 38V44M40 38V44" stroke="#72576b" strokeWidth="3" strokeLinecap="round" />
+        </>
+      )}
+      {item === "toy" && (
+        <>
+          <circle cx="24" cy="24" r="18" fill="#ef8b64" />
+          <path d="M8 21Q24 9 40 21M8 27Q24 39 40 27" fill="none" stroke="#fff0ce" strokeWidth="3" />
+        </>
+      )}
+      {item === "lamp" && (
+        <>
+          <path d="M24 27V45M15 45H33" stroke="#806a4d" strokeWidth="4" strokeLinecap="round" />
+          <path d="M9 13Q24 -1 39 13L35 25H13Z" fill="#e4b966" stroke="#9a7951" strokeWidth="2" />
+          <path d="M16 28H32" stroke="#f8e4a1" strokeWidth="2" opacity=".7" />
+        </>
+      )}
+      {item === "window" && (
+        <>
+          <rect x="5" y="5" width="38" height="38" rx="5" fill="#d9f3f0" stroke="#8b765a" strokeWidth="4" />
+          <path d="M24 7V41M7 24H41" stroke="#8b765a" strokeWidth="3" />
+          <path d="M10 38Q24 28 38 38" fill="#a6d1aa" opacity=".8" />
+        </>
+      )}
+      {item === "bowl" && (
+        <>
+          <path d="M4 19H44Q41 41 24 41Q7 41 4 19Z" fill="#76a9b3" />
+          <path d="M8 23H40" stroke="#d9f2eb" strokeWidth="3" strokeLinecap="round" />
+          <ellipse cx="24" cy="19" rx="20" ry="5" fill="#a8d8d7" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+function DraggableFurniture({
+  item,
+  position,
+  onMove,
+  onSelect,
+}: {
+  item: PetFurniture;
+  position: PetFurniturePosition;
+  onMove: (position: PetFurniturePosition) => void;
+  onSelect: (item: PetFurniture) => void;
+}) {
+  const [preview, setPreview] = useState<PetFurniturePosition | null>(null);
+  const drag = useRef<{
+    pointerId: number;
+    bounds: DOMRect;
+    startX: number;
+    startY: number;
+    origin: PetFurniturePosition;
+    latest: PetFurniturePosition;
+    moved: boolean;
+  } | null>(null);
+  const size = item === "bed" || item === "window" ? 54 : 46;
+  const shown = preview ?? position;
+
+  const onPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const bounds = event.currentTarget.parentElement?.getBoundingClientRect();
+    if (!bounds?.width || !bounds.height) return;
+    drag.current = {
+      pointerId: event.pointerId,
+      bounds,
+      startX: event.clientX,
+      startY: event.clientY,
+      origin: shown,
+      latest: shown,
+      moved: false,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const onPointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    const current = drag.current;
+    if (!current || event.pointerId !== current.pointerId) return;
+    event.preventDefault();
+    const dx = (event.clientX - current.startX) / current.bounds.width * 100;
+    const dy = (event.clientY - current.startY) / current.bounds.height * 100;
+    const marginX = Math.max(9, size / 2 / current.bounds.width * 100);
+    const marginY = Math.max(10, size / 2 / current.bounds.height * 100);
+    const next = {
+      x: Math.max(marginX, Math.min(100 - marginX, current.origin.x + dx)),
+      y: Math.max(marginY, Math.min(100 - marginY, current.origin.y + dy)),
+    };
+    current.latest = next;
+    current.moved ||= Math.abs(dx) + Math.abs(dy) > 0.4;
+    setPreview(next);
+  };
+
+  const finishPointer = (event: React.PointerEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    const current = drag.current;
+    if (!current || event.pointerId !== current.pointerId) return;
+    if (current.moved) onMove(current.latest);
+    drag.current = null;
+    setPreview(null);
+  };
+
+  const onKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    const step = event.shiftKey ? 5 : 2;
+    const deltas: Record<string, [number, number]> = {
+      ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step],
+    };
+    const delta = deltas[event.key];
+    if (!delta) return;
+    event.preventDefault();
+    onMove({
+      x: Math.max(9, Math.min(91, position.x + delta[0])),
+      y: Math.max(10, Math.min(90, position.y + delta[1])),
+    });
+  };
+
+  const label = PET_FURNITURE.find((entry) => entry.id === item)?.label ?? item;
+  return (
+    <button
+      type="button"
+      className={`pet-room-object${preview ? " is-dragging" : ""}`}
+      style={{ left: `${shown.x}%`, top: `${shown.y}%`, width: size, height: size }}
+      aria-label={`${label}. Drag to move, or focus and use arrow keys to reposition.`}
+      title={`${label} — drag to move`}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={finishPointer}
+      onPointerCancel={finishPointer}
+      onClick={(event) => { event.stopPropagation(); onSelect(item); }}
+      onKeyDown={onKeyDown}
+      data-testid={`pet-room-object-${item}`}
+    >
+      <FurnitureArt item={item} />
+    </button>
+  );
+}
 
 function Habitat({ pet, moodKey, dx = 0, onPet }: { pet: PetState; moodKey: string; dx?: number; onPet?: () => void }) {
   const sleeping = moodKey === "sleepy";
@@ -79,48 +233,6 @@ function Habitat({ pet, moodKey, dx = 0, onPet }: { pet: PetState; moodKey: stri
           <path d="M0 190Q95 165 177 190T320 178V236H0Z" fill="#35466a" />
           <ellipse cx="160" cy="201" rx="60" ry="9" fill="#a7bad0" opacity=".32" />
         </>
-      )}
-      {pet.furniture.includes("window") && pet.roomBackground !== "cozy" && (
-        <g>
-          <rect x="24" y="28" width="58" height="48" rx="5" fill="#d9f3f0" stroke="#8b765a" strokeWidth="4" />
-          <path d="M53 30V74M26 52H80" stroke="#8b765a" strokeWidth="2.5" />
-          <path d="M30 69Q52 54 76 69" fill="#a6d1aa" opacity=".8" />
-        </g>
-      )}
-      {pet.furniture.includes("plant") && (
-        <g>
-          <path d="M42 175Q34 145 46 137Q50 154 51 169Q53 143 69 138Q68 160 55 174Q68 158 81 161Q75 177 56 180Z" fill="#538766" />
-          <path d="M39 175H70L66 196H44Z" fill="#bd7959" />
-          <path d="M43 179H67" stroke="#e7b18a" strokeWidth="3" />
-        </g>
-      )}
-      {pet.furniture.includes("bed") && (
-        <g>
-          <rect x="228" y="174" width="66" height="24" rx="10" fill="#9c748a" />
-          <rect x="233" y="169" width="56" height="20" rx="9" fill="#e7b9c5" />
-          <ellipse cx="261" cy="185" rx="17" ry="7" fill="#f5e8df" />
-          <path d="M233 191V198M289 191V198" stroke="#72576b" strokeWidth="3" strokeLinecap="round" />
-        </g>
-      )}
-      {pet.furniture.includes("toy") && (
-        <g>
-          <circle cx="78" cy="190" r="11" fill="#ef8b64" />
-          <path d="M69 188Q78 181 87 188M69 193Q78 199 87 193" fill="none" stroke="#fff0ce" strokeWidth="2" />
-        </g>
-      )}
-      {pet.furniture.includes("lamp") && (
-        <g>
-          <path d="M279 169V113M268 171H291" stroke="#806a4d" strokeWidth="4" strokeLinecap="round" />
-          <path d="M264 114Q279 94 294 114L289 125H269Z" fill="#e4b966" stroke="#9a7951" strokeWidth="2" />
-          <circle cx="279" cy="132" r="22" fill="#f8e4a1" opacity=".18" />
-        </g>
-      )}
-      {pet.furniture.includes("bowl") && (
-        <g>
-          <path d="M257 185H303Q300 202 280 202Q260 201 257 185Z" fill="#76a9b3" />
-          <path d="M261 188H299" stroke="#d9f2eb" strokeWidth="3" strokeLinecap="round" />
-          <ellipse cx="280" cy="185" rx="23" ry="5" fill="#a8d8d7" />
-        </g>
       )}
       {!sleeping && moodKey === "joy" && (
         <g fill="#c98a52"><circle className="pet-spark" cx="108" cy="92" r="3" /><circle className="pet-spark" cx="214" cy="84" r="2.5" /></g>
@@ -242,6 +354,13 @@ export function PetSidebar() {
     }));
   };
 
+  const moveFurniture = (item: PetFurniture, position: PetFurniturePosition) => {
+    update((p) => ({
+      ...p,
+      furniturePositions: { ...p.furniturePositions, [item]: position },
+    }));
+  };
+
   const m = mood(pet);
   const meters: [keyof PetState, string][] = [["hunger", "Fullness"], ["happiness", "Happiness"], ["energy", "Energy"], ["hygiene", "Tidiness"]];
 
@@ -280,6 +399,15 @@ export function PetSidebar() {
              <Dialog.Description className="pet-live">Choose a look and care for your companion. Saved only on this browser.</Dialog.Description>
             <div className={`pet-habitat${game.on ? " is-game" : ""}`}>
               <Habitat pet={pet} moodKey={game.on ? "joy" : m.key} dx={dx} onPet={game.on ? undefined : petPip} />
+              {pet.furniture.map((item) => (
+                <DraggableFurniture
+                  key={item}
+                  item={item}
+                  position={pet.furniturePositions[item] ?? PET_FURNITURE_DEFAULT_POSITIONS[item]}
+                  onMove={(position) => moveFurniture(item, position)}
+                  onSelect={(selected) => setNotice(`${PET_FURNITURE.find((entry) => entry.id === selected)?.label ?? "Item"}: drag to move, or focus it and use the arrow keys.`)}
+                />
+              ))}
               {!game.on && <span key={hearts} className={hearts ? "pet-heart" : "pet-heart is-idle"} aria-hidden="true" />}
               {game.on && (
                 <button type="button" className="pet-acorn" style={{ left: `${(game.ax / 320) * 100}%`, top: `${(game.ay / 236) * 100}%` }}
@@ -332,6 +460,7 @@ export function PetSidebar() {
                   </button>
                 ))}
               </div>
+              <p className="pet-room-help">Drag items in the habitat to move them. You can also focus an item and use the arrow keys; hold Shift to move farther.</p>
               <span className="pet-customizer-label">Furniture &amp; things</span>
               <div className="pet-furniture-grid" role="group" aria-label="Add or remove room items">
                 {PET_FURNITURE.map((item) => {
