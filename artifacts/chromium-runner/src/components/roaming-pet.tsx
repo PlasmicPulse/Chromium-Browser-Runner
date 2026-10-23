@@ -24,9 +24,10 @@ const clampPos = (x: number, y: number): Position => {
 };
 
 function clampBed(x: number, y: number): Position {
+  const minY = Math.min(70, Math.max(0, window.innerHeight - BED_SIZE.height));
   return {
-    x: Math.min(Math.max(8, window.innerWidth - BED_SIZE.width - 8), Math.max(8, x)),
-    y: Math.min(Math.max(70, window.innerHeight - BED_SIZE.height - 52), Math.max(70, y)),
+    x: Math.min(Math.max(0, window.innerWidth - BED_SIZE.width - 8), Math.max(8, x)),
+    y: Math.min(Math.max(minY, window.innerHeight - BED_SIZE.height - 52), Math.max(minY, y)),
   };
 }
 
@@ -45,7 +46,11 @@ function readBed(): Position {
 }
 
 function bedDock(bed: Position): Position {
-  return clampPos(bed.x + 21, bed.y + 10);
+  return clampDragPos(bed.x + 21, bed.y + 10);
+}
+
+function clampDragPos(x: number, y: number): Position {
+  return { x: Math.max(0, Math.min(window.innerWidth - SIZE, x)), y: Math.max(0, Math.min(window.innerHeight - SIZE, y)) };
 }
 
 type Props = {
@@ -57,10 +62,11 @@ type Props = {
   onOpen: () => void;
   onToggleTucked: () => void;
   onDropInBed: () => void;
+  onLiftFromBed: () => void;
 };
 
 export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingPet(
-  { name, moodKey, appearance, tucked, open, onOpen, onToggleTucked, onDropInBed }, ref,
+  { name, moodKey, appearance, tucked, open, onOpen, onToggleTucked, onDropInBed, onLiftFromBed }, ref,
 ) {
   const [bedPos, setBedPos] = useState<Position>(readBed);
   const bedPosRef = useRef(bedPos);
@@ -128,7 +134,7 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
     e.stopPropagation();
     if (e.button !== 0) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    const current = clampPos(rect.x, rect.y);
+    const current = clampDragPos(rect.x, rect.y);
     setPos(current);
     setWalking(false);
     drag.current = { id: e.pointerId, sx: e.clientX, sy: e.clientY, ox: current.x, oy: current.y, moved: false };
@@ -140,15 +146,15 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
     e.stopPropagation();
     const mx = e.clientX - d.sx, my = e.clientY - d.sy;
     if (!d.moved && Math.hypot(mx, my) < 6) return;
-    if (!d.moved) { d.moved = true; setDragging(true); }
+    if (!d.moved) { d.moved = true; setDragging(true); if (tucked) onLiftFromBed(); }
     if (mx) setFace(mx > 0 ? 1 : -1);
-    setPos(clampPos(d.ox + mx, d.oy + my));
+    setPos(clampDragPos(d.ox + mx, d.oy + my));
   };
   const endDrag = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
     const d = drag.current;
     if (!d || d.id !== e.pointerId) return;
     e.stopPropagation();
-    const next = clampPos(d.ox + e.clientX - d.sx, d.oy + e.clientY - d.sy);
+    const next = clampDragPos(d.ox + e.clientX - d.sx, d.oy + e.clientY - d.sy);
     const target = bedRef.current?.getBoundingClientRect();
     const centerX = next.x + SIZE / 2, centerY = next.y + SIZE / 2;
     const droppedInBed = d.moved && !!target
@@ -231,12 +237,12 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
         onMouseDown={stop} onTouchStart={stop} onKeyDown={stop} onKeyUp={stop}
         onPointerEnter={event => {
           const rect = event.currentTarget.getBoundingClientRect();
-          setPos(clampPos(rect.x, rect.y)); setWalking(false); setHover(true);
+          setPos(clampDragPos(rect.x, rect.y)); setWalking(false); setHover(true);
         }}
         onPointerLeave={event => setHover(document.activeElement === event.currentTarget)}
         onFocus={event => {
           const rect = event.currentTarget.getBoundingClientRect();
-          setPos(clampPos(rect.x, rect.y)); setWalking(false); setHover(true);
+          setPos(clampDragPos(rect.x, rect.y)); setWalking(false); setHover(true);
         }}
         onBlur={() => setHover(false)}
         onClick={(e) => { e.stopPropagation(); const ignore = suppressClick.current && e.detail > 0; suppressClick.current = false; if (!ignore) onOpen(); }}

@@ -6,3 +6,4 @@
 - [Shared proxy rate limits](shared-proxy-limits.md) — Express req.ip may identify the shared proxy, so IP-only cooldowns can throttle unrelated visitors together.
 - [Chat identity](chat-identity.md) — Display names are unverified and may collide; matching names do not establish sender identity or message ownership.
 - [PostgreSQL pagination](postgres-pagination.md) — Preserve timestamp microseconds in cursors; explicitly type query rows to avoid cursor-inference and overload traps.
+- [Pet parking](pet-parking.md) — Parking is independent of care/rest; movable beds must remain reachable and dock correctly near screen edges.

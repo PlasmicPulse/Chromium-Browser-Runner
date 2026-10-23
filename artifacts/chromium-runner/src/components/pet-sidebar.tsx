@@ -13,7 +13,7 @@ function Habitat({ pet, moodKey, dx = 0, onPet }: { pet: PetState; moodKey: stri
   const sleeping = moodKey === "sleepy";
   const messy = pet.hygiene < 35;
   return (
-    <svg viewBox="0 0 320 236" role="img" onClick={onPet} aria-label={`${pet.name} the moss-hedgehog in a fern hollow`}>
+    <svg viewBox="0 0 320 236" role="img" onClick={onPet} aria-label={`${pet.name} the ${pet.appearance} in a fern hollow`}>
       <rect width="320" height="236" fill="#e8eedf" />
       <circle cx="262" cy="46" r="22" fill={sleeping ? "#d8dccb" : "#f1d9a8"} />
       <path d="M0 150 Q80 120 160 140 T320 130 V236 H0Z" fill="#cddcc6" />
@@ -153,6 +153,7 @@ export function PetSidebar() {
         onOpen={() => setOpen(true)}
         onToggleTucked={toggleBed}
         onDropInBed={() => update((p) => ({ ...p, tuckedAway: true }))}
+        onLiftFromBed={() => update((p) => ({ ...p, tuckedAway: false }))}
       />
       <Dialog.Portal>
         <Dialog.Content
