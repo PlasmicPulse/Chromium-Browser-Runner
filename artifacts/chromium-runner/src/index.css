@@ -165,13 +165,13 @@
 .icon-button:disabled { cursor: not-allowed; color: #b7bcb3; }
 .address-form {
   height: 38px; min-width: 0; flex: 1; display: flex; align-items: center; gap: 10px;
-  padding: 0 5px 0 13px; border: 1px solid #dedfd6; border-radius: 9px; background: #f0f1eb;
+  padding: 0 5px 0 13px; border: 1px solid color-mix(in srgb, var(--address-bar-ink, #293b3d) 20%, var(--address-bar-color, #f0f1eb)); border-radius: 9px; background: var(--address-bar-color, #f0f1eb);
   transition: border .16s, box-shadow .16s;
 }
-.address-form:focus-within { border-color: #71968a; box-shadow: 0 0 0 3px rgba(81,131,115,.12); }
-.address-lock { flex: none; color: #77908a; }
-.address-form input { width: 100%; min-width: 0; border: 0; outline: 0; color: #3c5050; background: transparent; font: 11px var(--app-font-mono); }
-.address-form input::placeholder { color: #98a19a; font-family: var(--app-font-sans); font-size: 11px; }
+.address-form:focus-within { border-color: var(--address-bar-ink, #293b3d); box-shadow: 0 0 0 3px color-mix(in srgb, var(--address-bar-ink, #293b3d) 14%, transparent); }
+.address-lock { flex: none; color: var(--address-bar-ink, #77908a); }
+.address-form input { width: 100%; min-width: 0; border: 0; outline: 0; color: var(--address-bar-ink, #3c5050); background: transparent; font: 11px var(--app-font-mono); }
+.address-form input::placeholder { color: color-mix(in srgb, var(--address-bar-ink, #293b3d) 52%, var(--address-bar-color, #f0f1eb)); font-family: var(--app-font-sans); font-size: 11px; }
 .clear-address, .go-button { display: grid; flex: none; place-items: center; width: 27px; height: 27px; border: 0; border-radius: 7px; cursor: pointer; }
 .clear-address { color: #8b9690; background: transparent; }
 .clear-address:hover { background: #e1e5dd; }

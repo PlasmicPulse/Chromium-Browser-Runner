@@ -1,7 +1,40 @@
 import { isPetAppearance, type PetAppearance } from "./pet-appearance";
 
+export const PET_ROOM_BACKGROUNDS = [
+  { id: "fern", label: "Fern hollow", swatch: "#d5e1cf" },
+  { id: "ocean", label: "Ocean", swatch: "#9fd5df" },
+  { id: "cozy", label: "Cozy room", swatch: "#efcfac" },
+  { id: "night", label: "Starlight", swatch: "#37476f" },
+] as const;
+export type PetRoomBackground = typeof PET_ROOM_BACKGROUNDS[number]["id"];
+export function isPetRoomBackground(value: unknown): value is PetRoomBackground {
+  return PET_ROOM_BACKGROUNDS.some((background) => background.id === value);
+}
+
+export const PET_FURNITURE = [
+  { id: "plant", label: "Plant", icon: "🌿" },
+  { id: "bed", label: "Bed", icon: "🛏️" },
+  { id: "toy", label: "Toy", icon: "🪀" },
+  { id: "lamp", label: "Lamp", icon: "💡" },
+  { id: "window", label: "Window", icon: "🪟" },
+  { id: "bowl", label: "Bowl", icon: "🥣" },
+] as const;
+export type PetFurniture = typeof PET_FURNITURE[number]["id"];
+export function isPetFurniture(value: unknown): value is PetFurniture {
+  return PET_FURNITURE.some((item) => item.id === value);
+}
+
 export type PetStats = { hunger: number; happiness: number; energy: number; hygiene: number };
-export type PetState = PetStats & { version: 1; name: string; updatedAt: number; resting: boolean; appearance: PetAppearance; tuckedAway: boolean };
+export type PetState = PetStats & {
+  version: 1;
+  name: string;
+  updatedAt: number;
+  resting: boolean;
+  appearance: PetAppearance;
+  tuckedAway: boolean;
+  roomBackground: PetRoomBackground;
+  furniture: PetFurniture[];
+};
 export type PetAction = "feed" | "play" | "rest" | "clean";
 
 export const PET_KEY = "pet-companion:v1";
@@ -13,7 +46,11 @@ const FLOOR = 8; // no death, stats never fully empty
 export const clamp = (n: number) => Math.min(100, Math.max(FLOOR, n));
 
 export function defaultPet(now = Date.now()): PetState {
-  return { version: 1, name: "Pip", hunger: 78, happiness: 82, energy: 71, hygiene: 86, updatedAt: now, resting: false, appearance: "hedgehog", tuckedAway: false };
+  return {
+    version: 1, name: "Pip", hunger: 78, happiness: 82, energy: 71, hygiene: 86,
+    updatedAt: now, resting: false, appearance: "hedgehog", tuckedAway: false,
+    roomBackground: "fern", furniture: [],
+  };
 }
 
 export function sanitizeName(s: unknown): string {
@@ -42,6 +79,8 @@ export function validate(raw: unknown, now = Date.now()): PetState {
     resting: r.resting === true,
     appearance: isPetAppearance(r.appearance) ? r.appearance : d.appearance,
     tuckedAway: r.tuckedAway === true,
+    roomBackground: isPetRoomBackground(r.roomBackground) ? r.roomBackground : d.roomBackground,
+    furniture: Array.isArray(r.furniture) ? [...new Set(r.furniture.filter(isPetFurniture))] : d.furniture,
   };
 }
 

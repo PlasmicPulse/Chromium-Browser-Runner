@@ -17,3 +17,8 @@
 .browser-tools-panel .new-session-button { margin: 0; }
 .browser-tools-panel .new-session-label { display: inline; }
 .browser-tools-panel .icon-button:focus-visible, .browser-tools-panel .new-session-button:focus-visible { outline: 2px solid #426e60; outline-offset: 1px; }
+.tools-color-control { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 42px; padding: 7px 12px; border: 1px solid #d6dfd2; border-radius: 9px; background: #fbfcf7; color: #344b42; font-size: 12px; font-weight: 650; }
+.tools-color-control input { width: 42px; height: 30px; padding: 2px; border: 1px solid #c7d2c7; border-radius: 7px; background: #fff; cursor: pointer; }
+.tools-color-control input:focus-visible, .tools-color-reset:focus-visible { outline: 2px solid #426e60; outline-offset: 2px; }
+.tools-color-reset { align-self: flex-start; min-height: 32px; padding: 0 11px; border: 1px solid #d2dbd0; border-radius: 8px; background: transparent; color: #53675e; cursor: pointer; font: 600 11px var(--app-font-sans); }
+.tools-color-reset:hover { background: #e3ece2; }

@@ -1,4 +1,4 @@
-import { type ClipboardEvent as ReactClipboardEvent, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react';
+import { type ClipboardEvent as ReactClipboardEvent, type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { useRemoteScroll } from '@/hooks/use-remote-scroll';
 import { remotePoint } from '@/lib/remote-point';
@@ -14,9 +14,27 @@ import {
 } from 'lucide-react';
 
 const PROFILE_TOKEN_KEY = 'chromium-runner-profile-v1';
+const ADDRESS_COLOR_KEY = 'chromium-runner-address-color-v1';
+const DEFAULT_ADDRESS_COLOR = '#f0f1eb';
 type RemoteState = 'disconnected' | 'connecting' | 'starting' | 'loading' | 'ready' | 'closed' | 'error';
 type ProfileState = 'empty' | 'saving' | 'saved' | 'error';
 type BrowserFrame = { image: string; url: string; title: string; status: number; viewport: { width: number; height: number }; scroll?: { ratio: number; canScroll: boolean }; fitToWidth?: boolean };
+
+function loadAddressColor(): string {
+  try {
+    const value = window.localStorage.getItem(ADDRESS_COLOR_KEY);
+    return value && /^#[0-9a-f]{6}$/i.test(value) ? value : DEFAULT_ADDRESS_COLOR;
+  } catch {
+    return DEFAULT_ADDRESS_COLOR;
+  }
+}
+
+function addressInk(color: string): string {
+  const channels = color.slice(1).match(/.{2}/g)?.map((channel) => parseInt(channel, 16) / 255) ?? [0.94, 0.94, 0.92];
+  const [r, g, b] = channels.map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.42 ? '#293b3d' : '#fffdf5';
+}
+
 type BrowserMessage =
   | { type: 'status'; state: 'starting' | 'loading' | 'ready' | 'closed'; message?: string }
   | { type: 'profile'; state: ProfileState; message?: string }
@@ -49,6 +67,7 @@ export default function Home() {
   const trackingTokenRef = useRef<string | null>(null);
   trackingTokenRef.current = consent?.enabled ? consent.token : null;
   const [address, setAddress] = useState('');
+  const [addressColor, setAddressColor] = useState(loadAddressColor);
   const [currentUrl, setCurrentUrl] = useState('');
   const [frame, setFrame] = useState<BrowserFrame | null>(null);
   const [remoteState, setRemoteState] = useState<RemoteState>('disconnected');
@@ -70,6 +89,12 @@ export default function Home() {
   function send(message: ClientMessage) {
     const socket = socketRef.current;
     if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
+  }
+
+  function changeAddressColor(color: string) {
+    if (!/^#[0-9a-f]{6}$/i.test(color)) return;
+    setAddressColor(color);
+    try { window.localStorage.setItem(ADDRESS_COLOR_KEY, color); } catch { /* Keep the selection for this session if storage is unavailable. */ }
   }
 
   useRemoteScroll(viewportRef, frame?.viewport ?? null, send);
@@ -305,7 +330,12 @@ export default function Home() {
                 <button type="button" className="icon-button" aria-label="Reload page" title="Reload page" disabled={!connected} onClick={() => { setRemoteState('loading'); send({ type: 'reload' }); }} data-testid="button-reload"><RotateCw size={16} className={remoteState === 'loading' ? 'turning' : ''} /></button>
                 {frame?.url && <a href={frame.url} target="_blank" rel="noreferrer" className="icon-button" aria-label="Open address in local browser" title="Open in local browser" data-testid="link-open-page"><ExternalLink size={16} /></a>}
               </div>
-            <form className="address-form" onSubmit={submit} aria-label="Navigate to website">
+            <form
+              className="address-form"
+              onSubmit={submit}
+              aria-label="Navigate to website"
+              style={{ '--address-bar-color': addressColor, '--address-bar-ink': addressInk(addressColor) } as CSSProperties}
+            >
               <LockKeyhole size={14} className="address-lock" aria-hidden="true" />
               <input
                 aria-label="Website address"
@@ -328,6 +358,14 @@ export default function Home() {
               <h3>Workspace</h3>
               <TabDisguise />
               <button type="button" className="icon-button" aria-label={maximized ? 'Restore display' : 'Maximize display'} onClick={() => setMaximized(value => !value)} data-testid="button-maximize">{maximized ? <Minimize2 size={17} /> : <Maximize2 size={17} />}<span>{maximized ? 'Restore display' : 'Maximize display'}</span></button>
+            </section>
+            <section className="tools-section" aria-label="Appearance">
+              <h3>Appearance</h3>
+              <label className="tools-color-control">
+                <span>Search bar color</span>
+                <input type="color" aria-label="Search bar color" value={addressColor} onChange={(event) => changeAddressColor(event.target.value)} data-testid="input-address-color" />
+              </label>
+              <button type="button" className="tools-color-reset" onClick={() => changeAddressColor(DEFAULT_ADDRESS_COLOR)} data-testid="button-address-color-reset">Reset color</button>
             </section>
             <section className="tools-section" aria-label="Session and settings">
               <h3>Session &amp; settings</h3>

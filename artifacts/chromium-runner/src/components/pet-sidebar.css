@@ -116,6 +116,18 @@
 .pet-look.is-selected { border-color: #638a78; box-shadow: inset 0 0 0 1px #638a78; background: #e5ede2; color: #315e51; }
 .pet-look:focus-visible { outline: 2px solid #b76845; outline-offset: 2px; }
 .pet-look-sprite { width: 38px; height: 32px; }
+.pet-customizer { display: grid; gap: 8px; margin-top: 14px; padding: 11px; border: 1px solid #d3dccf; border-radius: 11px; background: #eef1e8; }
+.pet-customizer h3 { margin: 0; color: #315e51; font-size: 12px; font-weight: 800; }
+.pet-customizer-label { margin-top: 2px; color: #718078; font: 9px var(--app-font-mono); letter-spacing: .08em; text-transform: uppercase; }
+.pet-room-backgrounds { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+.pet-room-background, .pet-furniture-item { min-width: 0; display: flex; align-items: center; gap: 7px; padding: 6px 8px; border: 1px solid #d3dccf; border-radius: 8px; background: #fbfaf5; color: #53665d; font: 650 10px var(--app-font-sans); text-align: left; cursor: pointer; }
+.pet-room-background:hover, .pet-furniture-item:hover { background: #e5ede2; }
+.pet-room-background.is-selected, .pet-furniture-item.is-selected { border-color: #638a78; box-shadow: inset 0 0 0 1px #638a78; background: #e3ece2; color: #315e51; }
+.pet-room-swatch { flex: none; width: 20px; height: 20px; border: 1px solid #283b3d26; border-radius: 6px; }
+.pet-furniture-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+.pet-furniture-item { flex-direction: column; justify-content: center; gap: 2px; min-height: 48px; padding: 4px 2px; text-align: center; }
+.pet-furniture-item > span:first-child { font-size: 17px; line-height: 1.1; }
+.pet-room-background:focus-visible, .pet-furniture-item:focus-visible { outline: 2px solid #b76845; outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) {
   .roam-pet, .roam-body, .pet-chase { transition: none !important; }
   .roam-svg, .pet-heart, .pet-acorn { animation: none !important; }
