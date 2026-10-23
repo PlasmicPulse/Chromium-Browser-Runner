@@ -9,6 +9,7 @@ import Home from '@/pages/home';
 import OwnerPage from '@/pages/owner';
 import { ActivityConsentProvider } from '@/lib/activity-consent';
 import { ActivityAccessGate } from '@/components/activity-access-gate';
+import { TabAppearanceProvider } from '@/lib/tab-appearance-context';
 import { ClerkProviderWithRouter, ClerkQueryClientCacheInvalidator, SignInPage, SignUpPage, basePath } from '@/lib/clerk';
 
 const queryClient = new QueryClient();
@@ -43,7 +44,7 @@ function App() {
         <QueryClientProvider client={queryClient}>
           <ClerkQueryClientCacheInvalidator />
           <TooltipProvider>
-            <Router />
+            <TabAppearanceProvider><Router /></TabAppearanceProvider>
             <Toaster />
           </TooltipProvider>
         </QueryClientProvider>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'wouter';
 import { useAuth, useClerk } from '@clerk/react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -9,10 +9,6 @@ import {
 import { AlertCircle, ArrowLeft, Check, Copy, Download, LogOut, ShieldAlert } from 'lucide-react';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
-
-function usePageTitle(title: string) {
-  useEffect(() => { const prev = document.title; document.title = title; return () => { document.title = prev; }; }, [title]);
-}
 
 function Shell({ children, signedIn }: { children: React.ReactNode; signedIn?: boolean }) {
   const { signOut } = useClerk();
@@ -29,7 +25,6 @@ function Shell({ children, signedIn }: { children: React.ReactNode; signedIn?: b
 }
 
 export default function OwnerPage() {
-  usePageTitle('Owner dashboard - Chromium Browser Runner');
   const { isLoaded, isSignedIn } = useAuth();
   const access = useQuery({
     queryKey: getGetOwnerAccessQueryKey(),

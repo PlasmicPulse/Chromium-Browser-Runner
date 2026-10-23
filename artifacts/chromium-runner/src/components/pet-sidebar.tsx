@@ -1,0 +1,158 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { Bath, Carrot, Moon, PawPrint, Pencil, Sparkles, X } from "lucide-react";
+import "./pet-sidebar.css";
+import { apply, decay, load, mood, sanitizeName, save, type PetAction, type PetState } from "./pet-state";
+
+const TICK_MS = 30_000;
+const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+
+function Habitat({ pet, moodKey }: { pet: PetState; moodKey: string }) {
+  const sleeping = moodKey === "sleepy";
+  const messy = pet.hygiene < 35;
+  return (
+    <svg viewBox="0 0 320 236" role="img" aria-label={`${pet.name} the moss-hedgehog in a fern hollow`}>
+      <rect width="320" height="236" fill="#e8eedf" />
+      <circle cx="262" cy="46" r="22" fill={sleeping ? "#d8dccb" : "#f1d9a8"} />
+      <path d="M0 150 Q80 120 160 140 T320 130 V236 H0Z" fill="#cddcc6" />
+      <path d="M0 186 Q90 166 170 180 T320 176 V236 H0Z" fill="#b7cbb0" />
+      <g fill="#7fa48f" opacity=".8">
+        <path d="M30 186 q-6-40 14-62 q-2 30 -6 62z" /><path d="M44 186 q10-34 34-44 q-16 22 -26 44z" />
+        <path d="M282 182 q-4-36 16-56 q-4 28 -8 56z" /><path d="M270 182 q-14-26 -36-30 q16 14 28 30z" />
+      </g>
+      <ellipse cx="236" cy="190" rx="16" ry="12" fill="#c98a52" /><path d="M222 184 q14-12 28 0" fill="#7a5a3a" />
+      <rect x="64" y="176" width="34" height="14" rx="7" fill="#e5c9a8" />
+      <ellipse cx="160" cy="200" rx="58" ry="9" fill="#9cb495" opacity=".7" />
+      {!sleeping && moodKey === "joy" && (
+        <g fill="#c98a52"><circle className="pet-spark" cx="108" cy="92" r="3" /><circle className="pet-spark" cx="214" cy="84" r="2.5" /></g>
+      )}
+      <g className="pet-critter">
+        <path d="M104 186 Q100 108 160 102 Q222 106 216 186Z" fill="#567c6c" />
+        <g fill="#3f6556">{[0,1,2,3,4,5,6].map((i) => <path key={i} d={`M${112 + i * 15} ${120 - Math.abs(3 - i) * -2} l7 -14 l7 14z`} />)}</g>
+        <ellipse cx="160" cy="160" rx="42" ry="32" fill="#f2e6cf" />
+        <circle cx="136" cy="168" r="7" fill="#e9a990" opacity=".55" /><circle cx="184" cy="168" r="7" fill="#e9a990" opacity=".55" />
+        {sleeping ? (
+          <g stroke="#293b3d" strokeWidth="3" strokeLinecap="round" fill="none"><path d="M138 152 q6 5 12 0" /><path d="M170 152 q6 5 12 0" /></g>
+        ) : (
+          <g fill="#293b3d"><circle cx="144" cy="152" r="5" /><circle cx="176" cy="152" r="5" /><circle cx="146" cy="150" r="1.6" fill="#fff8ec" /><circle cx="178" cy="150" r="1.6" fill="#fff8ec" /></g>
+        )}
+        <ellipse cx="160" cy="163" rx="4" ry="3" fill="#b76845" />
+        <path d={moodKey === "joy" ? "M150 171 q10 9 20 0" : moodKey === "calm" || sleeping ? "M153 172 q7 4 14 0" : "M153 175 q7 -4 14 0"} stroke="#293b3d" strokeWidth="2.4" fill="none" strokeLinecap="round" />
+        <ellipse cx="130" cy="188" rx="10" ry="6" fill="#3f6556" /><ellipse cx="190" cy="188" rx="10" ry="6" fill="#3f6556" />
+        {messy && <g fill="#8a6a4a"><circle cx="122" cy="140" r="4" /><circle cx="198" cy="134" r="3" /><path d="M176 112 l10 -4 l-2 8z" /></g>}
+      </g>
+      {sleeping && <text className="pet-z" x="212" y="104" fill="#5d706c" fontSize="18" fontWeight="800">z</text>}
+    </svg>
+  );
+}
+
+export function PetSidebar() {
+  const [open, setOpen] = useState(false);
+  const [{ pet, storage }, setBox] = useState(load);
+  const [stored, setStored] = useState(storage);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [bounce, setBounce] = useState(false);
+  const [notice, setNotice] = useState("");
+  const bounceT = useRef<number | undefined>(undefined);
+
+  const update = useCallback((fn: (p: PetState) => PetState) => {
+    setBox((b) => {
+      const next = fn(decay(b.pet));
+      setStored(save(next));
+      return { pet: next, storage: b.storage };
+    });
+  }, []);
+
+  // Decay only ticks while panel is open; elapsed time is caught up via timestamps.
+  useEffect(() => {
+    if (!open) return;
+    update((p) => p);
+    const id = window.setInterval(() => update((p) => p), TICK_MS);
+    return () => window.clearInterval(id);
+  }, [open, update]);
+
+  useEffect(() => () => window.clearTimeout(bounceT.current), []);
+
+  const act = (a: PetAction) => {
+    update((p) => apply(p, a));
+    const msg = { feed: "Crunch crunch. Clover biscuit gone.", play: "Acorn chase! Tail-wiggles all round.", rest: pet.resting ? "Stretching awake." : "Settling into the moss for a nap.", clean: "Splash. Quills sparkling again." }[a];
+    setNotice(msg);
+    setBounce(true);
+    window.clearTimeout(bounceT.current);
+    bounceT.current = window.setTimeout(() => setBounce(false), 1000);
+  };
+
+  const m = mood(pet);
+  const meters: [keyof PetState, string][] = [["hunger", "Fullness"], ["happiness", "Happiness"], ["energy", "Energy"], ["hygiene", "Tidiness"]];
+
+  return (
+    <Dialog.Root open={open} onOpenChange={setOpen} modal={false}>
+      <Dialog.Trigger className="icon-button" aria-label="Open pet companion" data-testid="button-pet" title="Pet companion">
+        <PawPrint size={16} />
+      </Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Content
+          className={`pet-drawer mood-${m.key}${bounce ? " pet-bounce" : ""}`}
+          data-testid="panel-pet"
+          onInteractOutside={(e) => e.preventDefault()}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          onKeyDown={stop} onKeyUp={stop} onKeyPress={stop}
+          onPointerDown={stop} onMouseDown={stop} onWheel={stop} onTouchStart={stop}
+        >
+          <div className="pet-head">
+            <div>
+              <div className="pet-kicker">Companion</div>
+              <Dialog.Title asChild><h2>Fern hollow</h2></Dialog.Title>
+            </div>
+            <Dialog.Close className="pet-close" aria-label="Close pet companion" data-testid="button-pet-close"><X size={16} /></Dialog.Close>
+          </div>
+          <div className="pet-body">
+            <Dialog.Description className="pet-live">Care for your moss-hedgehog. Saved only on this browser.</Dialog.Description>
+            <div className="pet-habitat"><Habitat pet={pet} moodKey={m.key} /></div>
+            <div className="pet-nameplate">
+              <span className="pet-name" data-testid="text-pet-name">{pet.name}</span>
+              <span className="pet-mood-chip" data-testid="status-pet-mood">{m.label}</span>
+            </div>
+            <p className="pet-line" aria-live="polite" data-testid="text-pet-feedback">{notice || m.line}</p>
+            {editing ? (
+              <form className="pet-edit" onSubmit={(e) => { e.preventDefault(); update((p) => ({ ...p, name: sanitizeName(draft) })); setEditing(false); }}>
+                <input aria-label="Pet name" maxLength={20} value={draft} autoFocus onChange={(e) => setDraft(e.target.value)} data-testid="input-pet-name" />
+                <button type="submit" className="pet-small-btn" data-testid="button-pet-name-save">Save</button>
+              </form>
+            ) : (
+              <div className="pet-edit">
+                <button type="button" className="pet-small-btn" onClick={() => { setDraft(pet.name); setEditing(true); }} data-testid="button-pet-rename"><Pencil size={12} /> Rename</button>
+              </div>
+            )}
+            <div className="pet-meters">
+              {meters.map(([k, label]) => {
+                const v = Math.round(pet[k] as number);
+                return (
+                  <label key={k} className={`pet-meter-row${v < 35 ? " is-low" : ""}`}>
+                    <span>{label}</span>
+                    <progress max={100} value={v} data-testid={`meter-pet-${k}`} />
+                    <span>{v}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <div className="pet-actions">
+              <button type="button" className="pet-action" onClick={() => act("feed")} data-testid="button-pet-feed"><Carrot size={15} /> Feed</button>
+              <button type="button" className="pet-action" onClick={() => act("play")} data-testid="button-pet-play"><Sparkles size={15} /> Play</button>
+              <button type="button" className="pet-action" aria-pressed={pet.resting} onClick={() => act("rest")} data-testid="button-pet-rest"><Moon size={15} /> {pet.resting ? "Wake" : "Rest"}</button>
+              <button type="button" className="pet-action" onClick={() => act("clean")} data-testid="button-pet-clean"><Bath size={15} /> Clean</button>
+            </div>
+            <p className="pet-note" data-testid="text-pet-storage">
+              {stored
+                ? <><strong>Pet saved on this browser only.</strong> {pet.name} lives in local storage, not on the server. Stats drift slowly while you're away, but never hit zero. Required site activity logging still applies.</>
+                : <><strong>Storage unavailable.</strong> {pet.name} will be here this session but won't be remembered after reload. Pet state is not sent to the server. Required site activity logging still applies.</>}
+            </p>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
+export default PetSidebar;

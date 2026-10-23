@@ -1,0 +1,10 @@
+.tab-disguise > h2 { padding-right: 22px; }
+.tab-disguise-form { display: flex; flex-direction: column; gap: 9px; font-size: 12px; }
+.tab-disguise-presets { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 8px; }
+.tab-disguise-form label { font-weight: 600; margin-top: 5px; }
+.tab-disguise-form input, .tab-disguise-form select { width: 100%; min-width: 0; border: 1px solid #bccdc0; border-radius: 7px; padding: 10px; background: white; color: #263c34; font-size: 16px; }
+.tab-disguise-form input:focus, .tab-disguise-form select:focus { outline: 2px solid #426e60; outline-offset: 2px; }
+.tab-disguise-preview { display: flex; align-items: center; gap: 9px; margin: 8px 0; padding: 12px; border: 1px solid #d0dbce; border-radius: 10px 10px 0 0; background: #eaf0e8; }
+.tab-disguise-preview img { flex: none; }
+.tab-disguise-preview span:first-of-type { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tab-disguise-feedback { color: #315e51; font-size: 12px; line-height: 1.5; }

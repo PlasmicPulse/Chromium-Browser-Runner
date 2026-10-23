@@ -1,6 +1,10 @@
 import type { Response } from "express";
 import { pool } from "@workspace/db";
 
+type ActivityExportRow = { id: number; device_id: string; created_at: Date } & (
+  { username: string; message: string } | { address: string; cursor_time: string }
+);
+
 async function write(res: Response, text: string): Promise<void> {
   if (res.destroyed || res.write(text)) return;
   await new Promise<void>((resolve) => {
@@ -35,24 +39,33 @@ export async function exportActivity(res: Response, kind: "chat" | "visits"): Pr
     "All timestamps are UTC. Only activity recorded after explicit opt-in is included.",
     "Device IDs identify consenting browser profiles, not a verified person or physical device.",
     chat ? "Messages are JSON-escaped to preserve one record per line." : "Addresses exclude credentials, query strings, and fragments.",
+    ...(chat ? [] : ["Visit order: newest to oldest."]),
     "Stopping logging prevents future entries; previously recorded entries remain.",
     "",
   ].join("\n") + "\n");
   let cursor = 0;
-  while (!res.destroyed && cursor < maxId) {
-    const result = await pool.query(
-      `SELECT id, device_id, created_at, ${chat ? "username, message" : "address"}
-       FROM ${table} WHERE id > $1 AND id <= $2 ${chat ? "AND device_id IS NOT NULL" : ""}
-       ORDER BY id LIMIT 500`, [cursor, maxId],
+  // Keep PostgreSQL's full timestamp precision; JS Date cursors would lose microseconds.
+  let visitCursor: string | null = null;
+  while (!res.destroyed) {
+    const result: { rows: ActivityExportRow[] } = await pool.query(
+      chat
+        ? `SELECT id, device_id, created_at, username, message FROM chat_messages
+           WHERE id > $1 AND id <= $2 AND device_id IS NOT NULL ORDER BY id LIMIT 500`
+        : `SELECT id, device_id, created_at, created_at::text AS cursor_time, address FROM page_visits
+           WHERE id <= $3 AND ($1::timestamptz IS NULL OR (created_at, id) < ($1::timestamptz, $2::bigint))
+           ORDER BY created_at DESC, id DESC LIMIT 500`,
+      chat ? [cursor, maxId] : [visitCursor, cursor, maxId],
     );
     if (!result.rows.length) break;
     const lines = result.rows.map(row => {
       const common = `[${row.created_at.toISOString()}] device=${row.device_id}`;
-      return chat
+      return "message" in row
         ? `${common} username=${logField(row.username)} message=${logField(row.message)}`
         : `${common} address=${logField(row.address)}`;
     });
-    cursor = result.rows[result.rows.length - 1].id;
+    const last = result.rows[result.rows.length - 1];
+    cursor = last.id;
+    if ("cursor_time" in last) visitCursor = last.cursor_time;
     await write(res, lines.join("\n") + "\n");
   }
   if (!res.destroyed) res.end();

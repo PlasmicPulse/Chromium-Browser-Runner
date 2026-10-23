@@ -36,6 +36,12 @@ Open public websites in server-side Chromium, interact with a live browser strea
 - `lib/db/src/schema/` — saved browser profiles, community chat, and consenting visitor activity.
 - `lib/api-spec/` — OpenAPI contract; generated clients and validation live in `lib/api-client-react/` and `lib/api-zod/`.
 
+## Browser-local features
+
+- The tab disguise controls the tab title and favicon across all routes. Owner dashboard and sign-in pages must not override the visitor's chosen appearance. This does not disguise the URL, browser history, or recorded activity.
+- The pet companion is saved locally in the visitor's browser; pet state is not uploaded or added to activity logs. Required site activity logging still applies independently.
+- Visit-log text downloads are newest-first. Chat-log text downloads retain their existing chronological order.
+
 ## Architecture decisions
 
 Keep the imported workspace structure and stack. Development traffic goes through the shared path-based proxy; do not add a separate frontend-to-backend proxy.

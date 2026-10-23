@@ -5,6 +5,8 @@ import { remotePoint } from '@/lib/remote-point';
 import { SiteChat } from '@/components/site-chat';
 import { useActivityConsent } from '@/lib/activity-consent';
 import { ActivitySettings } from '@/components/activity-settings';
+import { TabDisguise } from '@/components/tab-disguise';
+import { PetSidebar } from '@/components/pet-sidebar';
 import {
   AlertCircle, ArrowLeft, ArrowRight, ExternalLink, Globe2, LoaderCircle,
   LockKeyhole, Radio, RotateCw, ShieldCheck, Trash2, X, Maximize2, Minimize2, UserCog,
@@ -319,6 +321,8 @@ export default function Home() {
             </form>
             <SiteChat />
             <ActivitySettings />
+            <TabDisguise />
+            <PetSidebar />
             <Link href="/owner" className="icon-button owner-link" aria-label="Owner dashboard" title="Owner dashboard" data-testid="link-owner"><UserCog size={16} /></Link>
             <button type="button" className="icon-button" aria-label="Maximize display" title="Maximize display" onClick={() => setMaximized(true)} data-testid="button-maximize"><Maximize2 size={17} /></button>
             <button
