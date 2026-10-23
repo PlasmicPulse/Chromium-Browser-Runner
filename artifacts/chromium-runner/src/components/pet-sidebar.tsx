@@ -80,10 +80,10 @@ export function PetSidebar() {
   const petPip = () => {
     const now = Date.now();
     setHearts((h) => h + 1);
-    if (now - petT.current < 4000) { setNotice(`${pet.name} leans into the scratch. Quills soft as moss.`); return; }
+    if (now - petT.current < 4000) { setNotice(`${pet.name} leans into the scratch.`); return; }
     petT.current = now;
     update(applyPetting);
-    react(pet.resting ? `${pet.name} snuffles in their sleep and smiles.` : [`${pet.name} purrs a tiny hedgehog purr.`, `Happy wiggle. ${pet.name} rolls half over.`, `${pet.name} boops your hand with a damp nose.`][now % 3]);
+    react(pet.resting ? `${pet.name} snuffles in their sleep and smiles.` : [`${pet.name} gives a tiny happy purr.`, `Happy wiggle. ${pet.name} rolls half over.`, `${pet.name} boops your hand with a damp nose.`][now % 3]);
   };
 
   const newAcorn = () => ({ ax: 40 + Math.random() * 240, ay: 70 + Math.random() * 110 });
@@ -127,7 +127,7 @@ export function PetSidebar() {
 
   const act = (a: PetAction) => {
     update((p) => apply(p, a));
-    const msg = { feed: "Crunch crunch. Clover biscuit gone.", play: "Acorn chase! Tail-wiggles all round.", rest: pet.resting ? "Stretching awake." : "Settling into the moss for a nap.", clean: "Splash. Quills sparkling again." }[a];
+    const msg = { feed: "Crunch crunch. Clover biscuit gone.", play: "Acorn chase! Happy wiggles all round.", rest: pet.resting ? "Stretching awake." : "Settling in for a nap.", clean: "Splash. All clean again." }[a];
     react(msg);
   };
 
@@ -173,7 +173,7 @@ export function PetSidebar() {
             <Dialog.Close className="pet-close" aria-label="Close pet companion" data-testid="button-pet-close"><X size={16} /></Dialog.Close>
           </div>
           <div className="pet-body">
-            <Dialog.Description className="pet-live">Care for your moss-hedgehog. Saved only on this browser.</Dialog.Description>
+             <Dialog.Description className="pet-live">Choose a look and care for your companion. Saved only on this browser.</Dialog.Description>
             <div className={`pet-habitat${game.on ? " is-game" : ""}`}>
               <Habitat pet={pet} moodKey={game.on ? "joy" : m.key} dx={dx} onPet={game.on ? undefined : petPip} />
               {!game.on && <span key={hearts} className={hearts ? "pet-heart" : "pet-heart is-idle"} aria-hidden="true" />}
