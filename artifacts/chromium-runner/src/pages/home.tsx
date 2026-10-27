@@ -10,9 +10,10 @@ import { PetSidebar } from '@/components/pet-sidebar';
 import { BrowserTools } from '@/components/browser-tools';
 import { BookmarkPanel } from '@/components/bookmark-panel';
 import { createBookmark, loadBookmarks, saveBookmarks, type Bookmark } from '@/components/bookmark-storage';
+import { useThemePreference } from '@/lib/theme-preference';
 import {
   AlertCircle, ArrowLeft, ArrowRight, Bookmark as BookmarkIcon, BookmarkCheck, ExternalLink, Globe2, LoaderCircle,
-  LockKeyhole, Radio, RotateCw, ShieldCheck, Trash2, X, Maximize2, Minimize2, UserCog,
+  LockKeyhole, Moon, Radio, RotateCw, ShieldCheck, Sun, Trash2, X, Maximize2, Minimize2, UserCog,
 } from 'lucide-react';
 
 const PROFILE_TOKEN_KEY = 'chromium-runner-profile-v1';
@@ -66,6 +67,7 @@ function getOrCreateProfileToken(): string {
 
 export default function Home() {
   const { consent, refetch: refreshAcceptance } = useActivityConsent();
+  const { darkMode, toggleDarkMode } = useThemePreference();
   const trackingTokenRef = useRef<string | null>(null);
   trackingTokenRef.current = consent?.enabled ? consent.token : null;
   const [address, setAddress] = useState('');
@@ -426,6 +428,19 @@ export default function Home() {
             </section>
             <section className="tools-section" aria-label="Appearance">
               <h3>Appearance</h3>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={darkMode}
+                aria-label="Dark mode"
+                className="tools-theme-control"
+                onClick={toggleDarkMode}
+                data-testid="button-dark-mode"
+              >
+                <span className="tools-theme-icon" aria-hidden="true">{darkMode ? <Moon size={16} /> : <Sun size={16} />}</span>
+                <span className="tools-theme-label"><strong>Dark mode</strong><small>{darkMode ? 'On' : 'Off'}</small></span>
+                <span className={`tools-theme-switch${darkMode ? ' is-on' : ''}`} aria-hidden="true"><i /></span>
+              </button>
               <label className="tools-color-control">
                 <span>Search bar color</span>
                 <input type="color" aria-label="Search bar color" value={addressColor} onChange={(event) => changeAddressColor(event.target.value)} data-testid="input-address-color" />

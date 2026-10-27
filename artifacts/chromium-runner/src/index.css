@@ -684,3 +684,126 @@ html, body, #root { width: 100%; height: 100%; overflow: hidden; }
   .toolbar .icon-button { width: 28px; height: 30px; }
   .chat-unread-dot { top: 2px; right: 2px; }
 }
+
+.dark .runner-shell,
+.dark .activity-access-shell,
+.dark .owner-shell,
+.dark .auth-shell {
+  color: #e5eee8;
+  background:
+    radial-gradient(ellipse at 8% 0%, rgba(201,243,106,.08), transparent 34%),
+    linear-gradient(145deg, #0b1e20 0%, #10282a 58%, #0d2224 100%);
+}
+.dark .browser-chrome {
+  border-color: #294849;
+  background: linear-gradient(160deg, #173335 0%, #122b2d 100%);
+  box-shadow: 0 22px 58px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.24), inset 0 1px rgba(255,255,255,.04);
+}
+.dark .browser-brandline { color: #e7f0e9; }
+.dark .browser-brand-mark { background: #c9f36a; }
+.dark .browser-brand-mark span { background: #173536; }
+.dark .browser-brand-name b { color: #9bb8aa; }
+.dark .browser-session-state { border-color: #355958; color: #aec5ba; }
+.dark .browser-session-state i { background: #79938a; }
+.dark .toolbar { border-color: #2c4c4d; background: #1a393b; box-shadow: inset 0 1px rgba(255,255,255,.03); }
+.dark .icon-button { color: #b9cec4; }
+.dark .icon-button:hover:not(:disabled) { color: #f3f7ee; background: #2a4d4a; }
+.dark .icon-button:disabled { color: #617a75; }
+.dark .chat-unread-dot { border-color: #1a393b; }
+.dark .chat-trigger:focus-visible .chat-unread-dot { border-color: #1a393b; }
+.dark .address-lock { color: var(--address-bar-ink, #9bb7aa); }
+.dark .clear-address { color: #9bb7aa; }
+.dark .clear-address:hover { color: #e4eee7; background: #2c4c4b; }
+.dark .bookmark-current { color: var(--address-bar-ink, #c6d8ce); }
+.dark .bookmark-current.is-saved { color: #ef8d70; }
+.dark .go-button { color: #173536; background: #c9f36a; }
+.dark .new-session-button { border-color: #355856; color: #c5d8ce; }
+.dark .new-session-button:hover { border-color: #5c8274; color: #f4f8ed; background: #254744; }
+.dark .inline-alert { border-color: #744d45; color: #ffd0c1; background: #382927; }
+.dark .viewport-frame { border-color: #2b4a4b; background: #102729; box-shadow: 0 8px 24px rgba(0,0,0,.2); }
+.dark .viewport-toolbar { border-color: #2b4a4b; background: #1b3739; }
+.dark .tab-title { color: #b2c8bd; }
+.dark .tab-title svg, .dark .open-external { color: #8eb49b; }
+.dark .http-status { color: #b8e5bd; background: #214438; }
+.dark .http-status.http-bad { color: #ffd0c1; background: #4a302d; }
+.dark .remote-viewport {
+  background-color: #102527;
+  background-image: radial-gradient(#274142 .7px, transparent .7px);
+}
+.dark .empty-icon, .dark .loading-orbit { border-color: #345656; color: #c9f36a; background: #1a393b; }
+.dark .error-icon { color: #ef8b77; border-color: #744d45; }
+.dark .empty-kicker { color: #c9f36a; }
+.dark .viewport-empty h2 { color: #eaf2eb; }
+.dark .empty-copy, .dark .empty-hint { color: #a5bdb2; }
+.dark .empty-hint { border-color: #355655; background: #193638; }
+.dark .profile-status { color: #a5bdb2; }
+.dark .profile-saved { color: #a9dda9; }
+.dark .profile-saving { color: #e6bc82; }
+.dark .profile-error { color: #ef9a87; }
+.dark .viewport-foot { border-color: #2b4a4b; color: #90aaa0; background: #173335; }
+.dark .viewport-foot svg { color: #a1d4a3; }
+.dark .restore-display { border-color: #365857; color: #dce9de; background: #173638ee; }
+.dark .restore-display:hover { color: #173536; background: #c9f36a; }
+.dark .page-scrollbar { accent-color: #c9f36a; }
+
+.dark .site-chat { border-color: #315251; color: #e5eee8; background: #132e30; }
+.dark .chat-room-header, .dark .chat-identity, .dark .chat-form { border-color: #2c4b4b; }
+.dark .chat-room-header h2 { color: #edf4ec; }
+.dark .chat-room-header p, .dark .chat-identity { color: #a9c0b5; }
+.dark .chat-room-icon { color: #173536; background: #c9f36a; }
+.dark .chat-identity button { color: #c1dfc9; }
+.dark .chat-identity button:hover { background: #254442; }
+.dark .chat-history { background: #0f2729; }
+.dark .chat-day span { color: #bdcec4; background: #264343; }
+.dark .chat-sender { color: #a9c0b5; }
+.dark .chat-bubble { border-color: #315050; color: #e6efe8; background: #1a393b; }
+.dark .is-own .chat-bubble { border-color: #326259; color: #f7fff4; background: #28574f; }
+.dark .chat-bubble time { color: #a0b7ac; }
+.dark .is-own .chat-bubble time { color: #d0e8d4; }
+.dark .chat-muted, .dark .chat-empty, .dark .chat-empty span { color: #a9c0b5; }
+.dark .chat-compose-row { border-color: #355756; background: #1a393b; }
+.dark .chat-compose-row:focus-within { border-color: #91bd8d; }
+.dark .chat-compose-row textarea { color: #edf4ec; }
+.dark .chat-form footer span, .dark .chat-name-screen > p, .dark .chat-name-cancel { color: #a9c0b5; }
+.dark .chat-name-form input { border-color: #355756; color: #edf4ec; background: #1a393b; }
+.dark .site-chat > .chat-disclosure-compact { color: #a9c0b5; }
+.dark .chat-disclosure { color: #c0d3c8; background: #203b3c; }
+
+.dark .activity-access-card, .dark .activity-settings-panel {
+  border-color: #315251;
+  color: #e5eee8;
+  background: #132e30;
+  box-shadow: 0 22px 58px rgba(0,0,0,.34);
+}
+.dark .activity-access-icon { color: #173536; background: #c9f36a; }
+.dark .activity-access-card h1, .dark .activity-settings-panel h2 { color: #edf4ec; }
+.dark .activity-access-intro, .dark .activity-access-retention, .dark .consent-list, .dark .consent-id { color: #b1c5bb; }
+.dark .activity-access-status, .dark .consent-state { color: #c5d8ce; background: #203b3c; }
+.dark .consent-state.is-on { color: #d9f1ce; background: #28513e; }
+.dark .consent-list strong, .dark .consent-id code, .dark .device-id code { color: #edf4ec; }
+.dark .consent-secondary { border-color: #456361; color: #d0dfd6; }
+.dark .consent-secondary:hover:not(:disabled) { background: #254343; }
+.dark .consent-link { color: #c9f36a; }
+.dark .activity-owner-link { color: #a9c0b5; }
+.dark .chat-disclosure { border-left-color: #ef7058; }
+
+.dark .owner-top { border-color: #294a4b; background: rgba(17,43,45,.94); }
+.dark .owner-back, .dark .owner-ghost { color: #d0dfd6; }
+.dark .owner-ghost { border-color: #456361; }
+.dark .owner-ghost:hover:not(:disabled) { background: #254343; }
+.dark .owner-hero h1, .dark .owner-gate h1, .dark .owner-empty h2 { color: #edf4ec; }
+.dark .owner-kicker { color: #c9f36a; }
+.dark .owner-lede, .dark .owner-gate { color: #b1c5bb; }
+.dark .owner-stats > div, .dark .owner-downloads, .dark .device-row, .dark .owner-empty {
+  border-color: #315251;
+  background: #132e30;
+}
+.dark .owner-stats span, .dark .owner-downloads p, .dark .device-row dt { color: #a9c0b5; }
+.dark .owner-stats .is-new, .dark .device-row.is-new { border-color: #754d43; background: #342725; }
+.dark .owner-stats .is-new strong { color: #ff9d83; }
+.dark .device-row dd { color: #dce9de; }
+.dark .tag { color: #c4d7cc; background: #264343; }
+.dark .tag-new, .dark .tag-off { color: #ffd0c1; background: #4a302d; }
+.dark .tag-on { color: #d9f1ce; background: #28513e; }
+.dark .owner-skeleton i { background: #203b3c; }
+.dark .auth-note { color: #a9c0b5; }
