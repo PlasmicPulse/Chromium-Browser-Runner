@@ -2,6 +2,8 @@ import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
 import { BedDouble } from "lucide-react";
 import { PET_APPEARANCES, PetSprite, type PetAppearance } from "./pet-appearance";
 import { PetImpact, type WallImpact } from "./pet-impact";
+import { PetGadgetLayer } from "./pet-gadget-layer";
+import type { GadgetPoint, GadgetTool } from "./pet-gadgets";
 
 const SIZE = 44;
 const BED_SIZE = { width: 88, height: 64 };
@@ -66,10 +68,13 @@ type Props = {
   onDropInBed: () => void;
   onLiftFromBed: () => void;
   playAction: { kind: "pinball" | "spin"; id: number } | null;
+  gadget: GadgetTool | null;
+  onGadgetCancel: () => void;
 };
+type Fetch = { x: number; y: number; phase: "chase" | "return"; home: Position };
 
 export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingPet(
-  { name, moodKey, appearance, tucked, chaseEnabled, open, onOpen, onToggleTucked, onDropInBed, onLiftFromBed, playAction }, ref,
+  { name, moodKey, appearance, tucked, chaseEnabled, open, onOpen, onToggleTucked, onDropInBed, onLiftFromBed, playAction, gadget, onGadgetCancel }, ref,
 ) {
   const [bedPos, setBedPos] = useState<Position>(readBed);
   const bedPosRef = useRef(bedPos);
@@ -95,6 +100,16 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
   const impactTimer = useRef<number | undefined>(undefined);
   const nextChaseAt = useRef(Date.now() + 270000 + Math.random() * 60000);
   const cursor = useRef<Position | null>(null);
+  const petEl = useRef<HTMLButtonElement | null>(null);
+  const setPetEl = useCallback((el: HTMLButtonElement | null) => {
+    petEl.current = el;
+    if (typeof ref === "function") ref(el); else if (ref) ref.current = el;
+  }, [ref]);
+  const [squashed, setSquashed] = useState(false);
+  const squashTimer = useRef<number | undefined>(undefined);
+  const [fetch, setFetch] = useState<Fetch | null>(null);
+  const fetchRef = useRef(fetch); fetchRef.current = fetch;
+  const fetching = fetch !== null;
 
   useEffect(() => {
     const track = (event: PointerEvent) => {
@@ -140,7 +155,7 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
 
   useEffect(() => { if (tucked) setPos(bedDock(bedPos)); }, [bedPos, tucked]);
 
-  const paused = hover || dragging || thrown || chasing || open || reduced || tucked || moodKey === "sleepy";
+  const paused = !!gadget || fetching || hover || dragging || thrown || chasing || open || reduced || tucked || moodKey === "sleepy";
   useEffect(() => {
     if (paused) { setWalking(false); return; }
     let stopT: number | undefined;
@@ -159,7 +174,7 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
 
   // A short, clearly announced chase happens occasionally while Pip is out exploring.
   useEffect(() => {
-    if (!chaseEnabled || open || reduced || tucked || moodKey === "sleepy" || dragging || thrown) {
+    if (gadget || !chaseEnabled || fetching || open || reduced || tucked || moodKey === "sleepy" || dragging || thrown) {
       setChasing(false);
       return;
     }
@@ -173,7 +188,7 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
       }, Math.max(1000, nextChaseAt.current - Date.now()));
     }
     return () => window.clearTimeout(timer);
-  }, [chaseEnabled, chasing, dragging, moodKey, open, reduced, thrown, tucked]);
+  }, [gadget, chaseEnabled, chasing, dragging, fetching, moodKey, open, reduced, thrown, tucked]);
 
   useEffect(() => {
     if (!chasing) return;
@@ -206,7 +221,42 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
   useEffect(() => () => {
     if (throwRaf.current !== null) window.cancelAnimationFrame(throwRaf.current);
     window.clearTimeout(impactTimer.current);
+    window.clearTimeout(squashTimer.current);
   }, []);
+
+  // A cancelled or switched tool never leaves Pip flattened.
+  useEffect(() => { window.clearTimeout(squashTimer.current); setSquashed(false); }, [gadget]);
+
+  // Fetch: run to the stick at a steady capped speed, pick it up, bring it back.
+  useEffect(() => {
+    if (!fetching) return;
+    let raf: number;
+    let previous = performance.now();
+    const step = (now: number) => {
+      const elapsed = Math.min(40, now - previous) / 1000;
+      previous = now;
+      const f = fetchRef.current;
+      if (f && throwRaf.current === null && !drag.current) {
+        const target = f.phase === "chase" ? { x: f.x - SIZE / 2, y: f.y - SIZE / 2 } : f.home;
+        const current = posRef.current;
+        const dx = target.x - current.x, dy = target.y - current.y;
+        const distance = Math.hypot(dx, dy);
+        if (distance < 4) {
+          if (f.phase === "chase") setFetch({ ...f, phase: "return" });
+          else setFetch(null);
+        } else {
+          const move = Math.min((f.phase === "chase" ? 175 : 125) * elapsed, distance);
+          const next = clampDragPos(current.x + dx / distance * move, current.y + dy / distance * move);
+          if (Math.abs(dx) > 1) setFace(dx >= 0 ? 1 : -1);
+          posRef.current = next;
+          setPos(next);
+        }
+      }
+      raf = window.requestAnimationFrame(step);
+    };
+    raf = window.requestAnimationFrame(step);
+    return () => window.cancelAnimationFrame(raf);
+  }, [fetching]);
 
   const launch = useCallback((x: number, y: number, vx: number, vy: number, mode: "toss" | "pinball" | "spin" = "toss") => {
     if (throwRaf.current !== null) window.cancelAnimationFrame(throwRaf.current);
@@ -267,6 +317,52 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
       launch(posRef.current.x, posRef.current.y, -7, -19, "spin");
     }
   }, [launch, playAction]);
+
+  const petRect = useCallback(() => petEl.current?.getBoundingClientRect() ?? null, []);
+  // Explicit toy interactions are the only gadget path allowed to lift Pip out of bed.
+  const knock = useCallback((vx: number, vy: number, mode: "toss" | "pinball") => {
+    const r = petEl.current?.getBoundingClientRect();
+    if (!r) return;
+    if (tucked) onLiftFromBed();
+    setChasing(false); setWalking(false);
+    const start = clampDragPos(r.x, r.y);
+    const cap = (v: number) => Math.max(-26, Math.min(26, v));
+    if (reduced) {
+      const d = Math.hypot(vx, vy) || 1;
+      const next = clampPos(start.x + vx / d * 120, start.y + vy / d * 90);
+      setFace(vx >= 0 ? 1 : -1);
+      posRef.current = next;
+      setPos(next);
+      return;
+    }
+    launch(start.x, start.y, cap(vx), cap(vy), mode);
+  }, [launch, onLiftFromBed, reduced, tucked]);
+  const onBallHit = useCallback((vx: number, vy: number) => knock(vx * 1.1, vy * 1.1 - 5, "toss"), [knock]);
+  const onBlast = useCallback((x: number, y: number) => {
+    const r = petEl.current?.getBoundingClientRect();
+    if (!r) return false;
+    const dx = r.x + r.width / 2 - x, dy = r.y + r.height / 2 - y;
+    const d = Math.hypot(dx, dy);
+    if (d > 150) return false;
+    const ux = d < 1 ? Math.random() - 0.5 : dx / d, uy = d < 1 ? -1 : dy / d;
+    const power = 26 - (d / 150) * 8;
+    knock(ux * power, uy * power - 4, "pinball");
+    return true;
+  }, [knock]);
+  const onBonk = useCallback(() => {
+    window.clearTimeout(squashTimer.current);
+    setSquashed(true);
+    squashTimer.current = window.setTimeout(() => setSquashed(false), 560);
+  }, []);
+  const onStickThrown = useCallback((to: GadgetPoint) => {
+    const r = petEl.current?.getBoundingClientRect();
+    if (tucked) onLiftFromBed();
+    setChasing(false); setWalking(false);
+    const home = r ? clampPos(r.x, r.y) : posRef.current;
+    posRef.current = r ? clampDragPos(r.x, r.y) : posRef.current;
+    setPos(posRef.current);
+    setFetch({ x: to.x, y: to.y, phase: "chase", home });
+  }, [onLiftFromBed, tucked]);
 
   const onPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
     e.stopPropagation();
@@ -356,6 +452,12 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
       <span id="roam-pet-help" className="pet-live">Press Enter or Space, or tap, to open {name}'s care panel. Drag to move {name}; flick quickly to toss them and make them bounce safely off the screen edge. Sometimes {name} gets bored and chases your cursor. Click the bed or drag {name} into it to stop wandering.</span>
       {chasing && <div className="pet-chase-alert" role="status"><span aria-hidden="true">😤</span> PIP IS CHASING YOUR CURSOR! <span aria-hidden="true">Catch me!</span></div>}
       {impact && <PetImpact key={impact.id} impact={impact} />}
+      {fetch && (
+        <svg className="pet-stick" viewBox="0 0 40 16" aria-hidden="true" data-testid="toy-pet-stick"
+          style={{ transform: fetch.phase === "chase" ? `translate3d(${fetch.x - 20}px, ${fetch.y - 8}px, 0)` : `translate3d(${pos.x + (face > 0 ? 18 : -14)}px, ${pos.y + 24}px, 0)` }}>
+          <path d="M3 8h34M24 8l7-6" stroke="#8a6a43" strokeWidth="5" strokeLinecap="round" fill="none" />
+        </svg>
+      )}
       <button
         ref={bedRef}
         type="button"
@@ -382,9 +484,9 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
         <span className="pet-bed-caption"><BedDouble size={11} /> {tucked ? "Tucked in" : "Bed"}</span>
       </button>
       <button
-        ref={ref}
+        ref={setPetEl}
         type="button"
-        className={`roam-pet mood-${moodKey}${walking || chasing ? " is-walking" : ""}${dragging ? " is-dragging" : ""}${thrown ? " is-thrown" : ""}${spinToss ? " is-spinning" : ""}${chasing ? " is-chasing" : ""}${open ? " is-open" : ""}${tucked ? " is-tucked" : ""}`}
+        className={`roam-pet${squashed ? " is-squashed" : ""}${fetching ? " is-fetching" : ""} mood-${moodKey}${walking || chasing ? " is-walking" : ""}${dragging ? " is-dragging" : ""}${thrown ? " is-thrown" : ""}${spinToss ? " is-spinning" : ""}${chasing ? " is-chasing" : ""}${open ? " is-open" : ""}${tucked ? " is-tucked" : ""}`}
         style={{ transform: `translate3d(${tucked && !thrown ? bedDock(bedPos).x : pos.x}px, ${tucked && !thrown ? bedDock(bedPos).y : pos.y}px, 0)` }}
         aria-label={`${name}, a ${lookLabel}, ${tucked ? "tucked in bed" : "exploring"}. Click to open the care panel`}
         aria-describedby="roam-pet-help"
@@ -409,12 +511,26 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
         onClick={(e) => { e.stopPropagation(); const ignore = suppressClick.current && e.detail > 0; suppressClick.current = false; if (!ignore) onOpen(); }}
       >
         <span className="roam-shadow" aria-hidden="true" />
-        <span className="roam-body" style={{ transform: `scaleX(${face})` }}>
+        <span className="roam-body" style={{ transform: `scale(${face * (squashed ? 1.45 : 1)}, ${squashed ? 0.42 : 1})` }}>
           <PetSprite appearance={appearance} sleepy={tucked || moodKey === "sleepy"} className="roam-svg" />
         </span>
         {tucked && <span className="roam-z" aria-hidden="true">z</span>}
         <span className="roam-tag" aria-hidden="true">{name}</span>
       </button>
+      {gadget && (
+        <PetGadgetLayer
+          key={gadget}
+          tool={gadget}
+          name={name}
+          reduced={reduced}
+          getPetRect={petRect}
+          onBallHit={onBallHit}
+          onBonk={onBonk}
+          onBlast={onBlast}
+          onStickThrown={onStickThrown}
+          onCancel={onGadgetCancel}
+        />
+      )}
     </div>
   );
 });

@@ -3,6 +3,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { Bath, BedDouble, Carrot, Hand, Moon, Orbit, Pencil, RotateCw, Sparkles, Timer, X } from "lucide-react";
 import { RoamingPet } from "./roaming-pet";
 import { PET_APPEARANCES, PetSprite } from "./pet-appearance";
+import { GADGETS, type GadgetTool } from "./pet-gadgets";
 import "./pet-sidebar.css";
 import {
   PET_FURNITURE,
@@ -263,6 +264,13 @@ export function PetSidebar() {
   const tossId = useRef(0);
   const [playAction, setPlayAction] = useState<{ kind: "pinball" | "spin"; id: number } | null>(null);
 
+  const [gadget, setGadget] = useState<GadgetTool | null>(null);
+  const chooseGadget = (tool: GadgetTool) => {
+    if (gadget === tool) { setGadget(null); setNotice("Toy mode off. Browsing works normally again."); return; }
+    setGadget(tool);
+    setNotice(`${GADGETS.find((g) => g.id === tool)?.label} ready. Press Escape or Done to stop.`);
+    setOpen(false);
+  };
   const playToss = (kind: "pinball" | "spin") => {
     setPlayAction({ kind, id: ++tossId.current });
   };
@@ -385,6 +393,8 @@ export function PetSidebar() {
         onDropInBed={() => update((p) => ({ ...p, tuckedAway: true }))}
         onLiftFromBed={() => update((p) => ({ ...p, tuckedAway: false }))}
         playAction={playAction}
+        gadget={gadget}
+        onGadgetCancel={() => setGadget(null)}
       />
       <Dialog.Portal>
         <Dialog.Content
@@ -440,7 +450,22 @@ export function PetSidebar() {
                 <RotateCw size={12} /> Spinning toss
               </button>
             </div>
-            <p className="pet-hint">Just for fun. Tosses never change Pip’s care stats.</p>
+            <div className="pet-gadget-grid" role="group" aria-label="Toy gadgets" data-testid="group-pet-gadgets">
+              {GADGETS.map((g) => (
+                <button key={g.id} type="button" className="pet-small-btn" aria-pressed={gadget === g.id} title={g.short}
+                  onClick={() => chooseGadget(g.id)} data-testid={`button-pet-gadget-${g.id}`}>
+                  <g.icon size={12} /> {g.label}
+                </button>
+              ))}
+            </div>
+            {gadget && (
+              <div className="pet-gadget-active" data-testid="status-pet-gadget-active">
+                <span>{GADGETS.find((g) => g.id === gadget)?.help} Escape also exits.</span>
+                <button type="button" className="pet-small-btn" onClick={() => setGadget(null)} data-testid="button-pet-gadget-stop"><X size={12} /> Stop</button>
+              </div>
+            )}
+            <p className="pet-hint">Pick a toy gadget, then play right on the page. The page only catches clicks while a toy is active.</p>
+            <p className="pet-hint">Just for fun. Tosses and toys never change Pip’s care stats.</p>
             <p className="pet-hint">Tap {pet.name} in the hollow to pet. In Acorn chase, tap or press Enter on each acorn within 15 seconds; every catch lifts happiness and energy.</p>
             <div className="pet-looks" role="group" aria-label="Choose your pet's look" data-testid="group-pet-appearances">
               {PET_APPEARANCES.map((look) => (
