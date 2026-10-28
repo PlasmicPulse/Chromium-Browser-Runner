@@ -108,26 +108,7 @@
 .pet-impact {
   position: absolute; z-index: 1; width: 0; height: 0; pointer-events: none;
 }
-.pet-wall-particle {
-  position: absolute; top: 0; left: 0; display: block;
-  clip-path: polygon(12% 0, 90% 8%, 100% 64%, 65% 100%, 0 83%);
-  box-shadow: 0 1px 3px #28332c70; opacity: 0;
-  animation: wall-debris .76s var(--debris-delay) cubic-bezier(.12,.65,.35,1) both;
-}
-.pet-impact-dust {
-  position: absolute; width: 100px; height: 100px; left: -50px; top: -50px; border-radius: 50%;
-  background: radial-gradient(circle, #f0ece0c9 0%, #c5bdac80 24%, #acb3ab35 48%, transparent 70%);
-  animation: wall-dust .65s ease-out both;
-}
-@keyframes wall-debris {
-  0% { opacity: 1; transform: translate(-50%, -50%) rotate(0); }
-  65% { opacity: 1; }
-  100% { opacity: 0; transform: translate(var(--debris-x), var(--debris-y)) rotate(var(--debris-spin)) scale(.5); }
-}
-@keyframes wall-dust {
-  0% { opacity: .95; transform: scale(.15); }
-  100% { opacity: 0; transform: scale(1.7); }
-}
+.pet-impact-canvas { position: absolute; left: 0; top: 0; display: block; width: 180px; height: 180px; }
 .pet-habitat svg { cursor: pointer; }
 .pet-habitat.is-game svg { cursor: default; }
 .pet-chase { transition: transform .45s cubic-bezier(.3,1.4,.5,1); }
@@ -210,8 +191,6 @@
   .roam-pet, .roam-body, .pet-chase { transition: none !important; }
   .roam-svg, .pet-heart, .pet-acorn, .pet-chase-alert, .pet-impact { animation: none !important; }
   .pet-heart { opacity: 0; }
-  .pet-wall-particle { display: none; }
-  .pet-impact-dust { animation: none; opacity: .25; transform: scale(.6); }
 }
 
 .dark .pet-drawer { border-color: #315251; color: #e5eee8; background: #132e30; box-shadow: 0 24px 70px rgba(0,0,0,.42); }
