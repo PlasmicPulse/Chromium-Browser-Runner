@@ -636,14 +636,17 @@ async function handleMessage(
         await page.keyboard.insertText(message.text);
         break;
       case "key":
+        // Browsers report Shift+Backspace as a combined key, but remote pages
+        // should receive Backspace just as they do from an unshifted press.
+        const key = message.key === "Shift+Backspace" ? "Backspace" : message.key;
         if (
-          !allowedKeys.has(message.key) &&
-          !/^(?:(?:Control|Alt|Meta|Shift)\+)*(?:[A-Za-z0-9]|Arrow(?:Down|Left|Right|Up)|F(?:[1-9]|1[0-2])|Enter)$/.test(message.key)
+          !allowedKeys.has(key) &&
+          !/^(?:(?:Control|Alt|Meta|Shift)\+)*(?:[A-Za-z0-9]|Arrow(?:Down|Left|Right|Up)|F(?:[1-9]|1[0-2])|Enter)$/.test(key)
         ) {
           sendError(session, "That keyboard key is not supported.");
           return;
         }
-        await page.keyboard.press(message.key);
+        await page.keyboard.press(key);
         break;
     }
     if (message.type !== "pointer" || message.phase !== "move") {

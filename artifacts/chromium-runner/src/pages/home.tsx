@@ -229,7 +229,9 @@ export default function Home() {
           setNotice('');
         } else {
           setSocketError(message.message || 'The remote browser encountered an error.');
-          setRemoteState('error');
+          if (message.message !== 'That keyboard key is not supported.') {
+            setRemoteState('error');
+          }
         }
       } catch {
         setSocketError('The browser connection returned an unreadable message.');
@@ -340,7 +342,7 @@ export default function Home() {
       event.ctrlKey ? 'Control+' : '',
       event.metaKey ? 'Meta+' : '',
       event.altKey ? 'Alt+' : '',
-      event.shiftKey ? 'Shift+' : '',
+      event.shiftKey && event.key !== 'Backspace' ? 'Shift+' : '',
       event.key,
     ].join('');
     send({ type: 'key', key });
@@ -473,6 +475,7 @@ export default function Home() {
               <AlertCircle size={14} /><span>{addressError || socketError}</span>
               {remoteState === 'error' && currentUrl && <button type="button" onClick={() => startSession(currentUrl)} data-testid="button-retry">Try again</button>}
               {addressError && <button type="button" aria-label="Dismiss address error" onClick={() => setAddressError('')}><X size={13} /></button>}
+              {socketError && <button type="button" aria-label="Dismiss browser error" onClick={() => setSocketError('')} data-testid="button-dismiss-browser-error"><X size={13} /></button>}
             </div>
           )}
           <div className="viewport-frame">
