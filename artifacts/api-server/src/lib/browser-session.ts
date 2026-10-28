@@ -27,7 +27,7 @@ const FRAME_INTERVAL_MS = 100;
 const MAX_FRAME_BACKLOG_BYTES = 256 * 1024;
 const PROFILE_SAVE_DEBOUNCE_MS = 1_200;
 const PROFILE_SAVE_INTERVAL_MS = 10_000;
-const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
+const IDLE_TIMEOUT_MS = 60 * 60 * 1000;
 const allowedKeys = new Set([
   "Alt",
   "ArrowDown",
@@ -77,6 +77,7 @@ type BrowserMessage =
 type SafeProxy = Awaited<ReturnType<typeof startSafeProxy>>;
 
 type BrowserSession = {
+  sessionId: string;
   socket: WebSocket;
   trackingToken: string | null;
   browser: Browser | null;
@@ -94,6 +95,8 @@ type BrowserSession = {
   profileOperation: Promise<void>;
   capturingFrame: boolean;
   closed: boolean;
+  endingReason: string | null;
+  endingDetails: Record<string, unknown>;
   queue: Promise<void>;
   pendingInput: BrowserMessage | null;
   initializePromise: Promise<void> | null;
@@ -183,6 +186,16 @@ function sendProfileState(
   message?: string,
 ): void {
   send(session, { type: "profile", state, ...(message ? { message } : {}) });
+}
+
+function setEndingReason(
+  session: BrowserSession,
+  reason: string,
+  details: Record<string, unknown> = {},
+): void {
+  if (session.endingReason) return;
+  session.endingReason = reason;
+  session.endingDetails = details;
 }
 
 async function loadProfileState(
@@ -487,6 +500,12 @@ async function startSession(
       proxy: { server: session.proxy.origin, bypass: "" },
       args: ["--no-sandbox", "--disable-dev-shm-usage"],
     });
+    session.browser.on("disconnected", () => {
+      if (session.closed) return;
+      setEndingReason(session, "remote browser process disconnected");
+      sendStatus(session, "closed", "The remote browser process disconnected.");
+      session.socket.close(1011, "Remote browser process disconnected");
+    });
     if (session.closed) throw new Error("The browser session was closed.");
     session.context = await session.browser.newContext({
       viewport: { width: WIDTH, height: HEIGHT },
@@ -536,6 +555,7 @@ async function clearProfile(
   session.persistedStateJson = null;
   sendProfileState(session, "empty");
   sendStatus(session, "closed", "Saved cookies and site data were cleared.");
+  setEndingReason(session, "saved browser profile cleared");
   session.socket.close(1000, "Browser profile cleared");
 }
 
@@ -548,6 +568,7 @@ async function handleMessage(
     // Identity is bound to the accepted cookie at upgrade, never chosen by the socket client.
     if (message.token !== session.trackingToken) {
       session.closed = true;
+      setEndingReason(session, "activity logging acceptance token mismatch");
       sendError(session, "Activity logging acceptance is required to use the browser.");
       session.socket.close(1008, "Activity logging acceptance required");
     }
@@ -715,6 +736,8 @@ export function attachBrowserWebSocket(server: Server): void {
 
   webSocketServer.on("connection", (socket) => {
     if (!acquireBrowserSlot()) {
+      const sessionId = randomBytes(8).toString("hex");
+      logger.warn({ sessionId, reason: "browser capacity reached" }, "Remote browser session rejected");
       socket.send(
         JSON.stringify({
           type: "error",
@@ -726,6 +749,7 @@ export function attachBrowserWebSocket(server: Server): void {
     }
 
     const session: BrowserSession = {
+      sessionId: randomBytes(8).toString("hex"),
       socket,
       trackingToken: acceptedTokens.get(socket) ?? null,
       browser: null,
@@ -743,6 +767,8 @@ export function attachBrowserWebSocket(server: Server): void {
       profileOperation: Promise.resolve(),
       capturingFrame: false,
       closed: false,
+      endingReason: null,
+      endingDetails: {},
       queue: Promise.resolve(),
       pendingInput: null,
       initializePromise: null,
@@ -754,6 +780,7 @@ export function attachBrowserWebSocket(server: Server): void {
     const stopForAcceptance = () => {
       if (session.closed) return;
       session.closed = true;
+      setEndingReason(session, "activity logging acceptance revoked or unavailable");
       sendError(session, "Activity logging acceptance is required to use the browser.");
       socket.close(1008, "Activity logging acceptance required");
       // Interrupt a current navigation too; cleanup below also handles partial initialization.
@@ -775,7 +802,9 @@ export function attachBrowserWebSocket(server: Server): void {
 
     sendStatus(session, "starting");
     session.frameTimer = setInterval(() => {
-      if (Date.now() - session.lastActivity > IDLE_TIMEOUT_MS) {
+      const idleDurationMs = Date.now() - session.lastActivity;
+      if (idleDurationMs > IDLE_TIMEOUT_MS) {
+        setEndingReason(session, "idle timeout", { idleDurationMs });
         sendStatus(session, "closed", "This browser session expired after inactivity.");
         socket.close(1000, "Session expired");
         return;
@@ -834,9 +863,28 @@ export function attachBrowserWebSocket(server: Server): void {
       }
     });
 
-    const cleanup = (): Promise<void> => {
+    const cleanup = (
+      closeCode?: number,
+      closeReason?: Buffer,
+      socketError?: Error,
+    ): Promise<void> => {
       if (session.cleanupPromise) return session.cleanupPromise;
       session.closed = true;
+      const reason = session.endingReason ??
+        (socketError ? "websocket error" : closeCode === 1006 ? "unexpected websocket disconnect" : "client disconnected");
+      const logDetails = {
+        sessionId: session.sessionId,
+        reason,
+        closeCode,
+        closeMessage: closeReason?.toString("utf8").slice(0, 123) || undefined,
+        ...session.endingDetails,
+        ...(socketError ? { err: socketError } : {}),
+      };
+      if (socketError || closeCode === 1006) {
+        logger.warn(logDetails, "Remote browser session ended");
+      } else {
+        logger.info(logDetails, "Remote browser session ended");
+      }
       clearInterval(acceptanceTimer);
       removeRevocationListener();
       if (session.frameTimer) clearInterval(session.frameTimer);
@@ -858,7 +906,8 @@ export function attachBrowserWebSocket(server: Server): void {
       })();
       return session.cleanupPromise;
     };
-    socket.on("close", () => void cleanup());
-    socket.on("error", () => void cleanup());
+    logger.info({ sessionId: session.sessionId }, "Remote browser session started");
+    socket.on("close", (code, reason) => void cleanup(code, reason));
+    socket.on("error", (err) => void cleanup(undefined, undefined, err));
   });
 }
