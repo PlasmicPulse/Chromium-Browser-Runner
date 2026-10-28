@@ -77,13 +77,18 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
   const [hover, setHover] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [bedDragging, setBedDragging] = useState(false);
+  const [chasing, setChasing] = useState(false);
+  const [thrown, setThrown] = useState(false);
+  const [impact, setImpact] = useState<{ x: number; y: number; id: number } | null>(null);
   const [reduced, setReduced] = useState(() => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
   const [walking, setWalking] = useState(false);
-  const drag = useRef<{ id: number; sx: number; sy: number; ox: number; oy: number; moved: boolean } | null>(null);
+  const drag = useRef<{ id: number; sx: number; sy: number; ox: number; oy: number; moved: boolean; lastX: number; lastY: number; lastT: number; vx: number; vy: number } | null>(null);
   const bedDrag = useRef<{ id: number; sx: number; sy: number; ox: number; oy: number; moved: boolean } | null>(null);
   const suppressClick = useRef(false);
   const suppressBedClick = useRef(false);
   const posRef = useRef(pos); posRef.current = pos;
+  const throwRaf = useRef<number | null>(null);
+  const impactTimer = useRef<number | undefined>(undefined);
 
   const setBed = useCallback((next: Position) => {
     const safe = clampBed(next.x, next.y);
@@ -113,7 +118,7 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
 
   useEffect(() => { if (tucked) setPos(bedDock(bedPos)); }, [bedPos, tucked]);
 
-  const paused = hover || dragging || open || reduced || tucked || moodKey === "sleepy";
+  const paused = hover || dragging || thrown || chasing || open || reduced || tucked || moodKey === "sleepy";
   useEffect(() => {
     if (paused) { setWalking(false); return; }
     let stopT: number | undefined;
@@ -130,14 +135,95 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
     return () => { window.clearInterval(id); window.clearTimeout(stopT); };
   }, [paused]);
 
+  // A short, clearly announced chase happens occasionally while Pip is out exploring.
+  useEffect(() => {
+    if (open || reduced || tucked || moodKey === "sleepy" || dragging || thrown) {
+      setChasing(false);
+      return;
+    }
+    let timer: number;
+    if (chasing) {
+      timer = window.setTimeout(() => setChasing(false), 7200);
+    } else {
+      timer = window.setTimeout(() => setChasing(true), 25000 + Math.random() * 35000);
+    }
+    return () => window.clearTimeout(timer);
+  }, [chasing, dragging, moodKey, open, reduced, thrown, tucked]);
+
+  useEffect(() => {
+    if (!chasing) return;
+    const followCursor = (event: PointerEvent) => {
+      if (drag.current || bedDrag.current) return;
+      const current = posRef.current;
+      const next = clampDragPos(event.clientX - SIZE / 2, event.clientY - SIZE / 2);
+      if (Math.abs(next.x - current.x) > 1) setFace(next.x >= current.x ? 1 : -1);
+      posRef.current = next;
+      setPos(next);
+    };
+    window.addEventListener("pointermove", followCursor, { passive: true });
+    return () => window.removeEventListener("pointermove", followCursor);
+  }, [chasing]);
+
+  useEffect(() => () => {
+    if (throwRaf.current !== null) window.cancelAnimationFrame(throwRaf.current);
+    window.clearTimeout(impactTimer.current);
+  }, []);
+
+  const launch = useCallback((x: number, y: number, vx: number, vy: number) => {
+    if (throwRaf.current !== null) window.cancelAnimationFrame(throwRaf.current);
+    setChasing(false);
+    setThrown(true);
+    let px = x, py = y;
+    let speedX = vx, speedY = vy;
+    let previous = performance.now();
+    const started = previous;
+    let lastImpact = 0;
+    const frame = (now: number) => {
+      const scale = Math.min(2, Math.max(0.5, (now - previous) / 16.67));
+      previous = now;
+      px += speedX * scale;
+      py += speedY * scale;
+      speedY += 0.24 * scale;
+      speedX *= Math.pow(0.993, scale);
+      speedY *= Math.pow(0.993, scale);
+      const maxX = Math.max(0, window.innerWidth - SIZE);
+      const maxY = Math.max(0, window.innerHeight - SIZE);
+      let hitEdge = false;
+      if (px < 0 || px > maxX) { px = Math.min(maxX, Math.max(0, px)); speedX *= -0.62; hitEdge = true; }
+      if (py < 0 || py > maxY) { py = Math.min(maxY, Math.max(0, py)); speedY *= -0.62; hitEdge = true; }
+      const next = { x: px, y: py };
+      posRef.current = next;
+      setPos(next);
+      if (hitEdge && now - lastImpact > 180) {
+        lastImpact = now;
+        setImpact({ x: Math.min(maxX - 22, Math.max(22, px)), y: Math.min(maxY - 16, Math.max(30, py)), id: now });
+        window.clearTimeout(impactTimer.current);
+        impactTimer.current = window.setTimeout(() => setImpact(null), 720);
+      }
+      if (now - started < 2400 && Math.hypot(speedX, speedY) > 0.8) {
+        throwRaf.current = window.requestAnimationFrame(frame);
+      } else {
+        throwRaf.current = null;
+        setThrown(false);
+      }
+    };
+    throwRaf.current = window.requestAnimationFrame(frame);
+  }, []);
+
   const onPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     if (e.button !== 0) return;
+    if (throwRaf.current !== null) {
+      window.cancelAnimationFrame(throwRaf.current);
+      throwRaf.current = null;
+      setThrown(false);
+    }
+    setChasing(false);
     const rect = e.currentTarget.getBoundingClientRect();
     const current = clampDragPos(rect.x, rect.y);
     setPos(current);
     setWalking(false);
-    drag.current = { id: e.pointerId, sx: e.clientX, sy: e.clientY, ox: current.x, oy: current.y, moved: false };
+    drag.current = { id: e.pointerId, sx: e.clientX, sy: e.clientY, ox: current.x, oy: current.y, moved: false, lastX: e.clientX, lastY: e.clientY, lastT: e.timeStamp, vx: 0, vy: 0 };
     e.currentTarget.setPointerCapture?.(e.pointerId);
   };
   const onPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
@@ -147,8 +233,16 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
     const mx = e.clientX - d.sx, my = e.clientY - d.sy;
     if (!d.moved && Math.hypot(mx, my) < 6) return;
     if (!d.moved) { d.moved = true; setDragging(true); if (tucked) onLiftFromBed(); }
+    const elapsed = Math.max(1, e.timeStamp - d.lastT);
+    d.vx = (e.clientX - d.lastX) / elapsed;
+    d.vy = (e.clientY - d.lastY) / elapsed;
+    d.lastX = e.clientX;
+    d.lastY = e.clientY;
+    d.lastT = e.timeStamp;
     if (mx) setFace(mx > 0 ? 1 : -1);
-    setPos(clampDragPos(d.ox + mx, d.oy + my));
+    const next = clampDragPos(d.ox + mx, d.oy + my);
+    posRef.current = next;
+    setPos(next);
   };
   const endDrag = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
     const d = drag.current;
@@ -160,12 +254,18 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
     const droppedInBed = d.moved && !!target
       && centerX >= target.left + 5 && centerX <= target.right - 5
       && centerY >= target.top + 5 && centerY <= target.bottom - 5;
-    setPos(droppedInBed ? bedDock(bedPosRef.current) : next);
+    const velocity = Math.hypot(d.vx, d.vy);
+    posRef.current = droppedInBed ? bedDock(bedPosRef.current) : next;
+    setPos(posRef.current);
     suppressClick.current = d.moved;
     drag.current = null;
     setDragging(false);
-    if (droppedInBed) onDropInBed();
-  }, [onDropInBed]);
+    if (droppedInBed) {
+      onDropInBed();
+    } else if (d.moved && velocity > 0.24) {
+      launch(next.x, next.y, Math.max(-20, Math.min(20, d.vx * 16)), Math.max(-20, Math.min(20, d.vy * 16)));
+    }
+  }, [launch, onDropInBed]);
 
   const bedPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
     e.stopPropagation();
@@ -194,7 +294,11 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
   const lookLabel = PET_APPEARANCES.find((choice) => choice.id === appearance)?.label ?? "pet";
   return (
     <div className="roam-layer" data-testid="layer-pet-roam">
-      <span id="roam-pet-help" className="pet-live">Press Enter or Space, or tap, to open {name}'s care panel. Drag to move {name}. Click the bed or drag {name} into it to stop wandering.</span>
+      <span id="roam-pet-help" className="pet-live">Press Enter or Space, or tap, to open {name}'s care panel. Drag to move {name}; flick quickly to toss them and make them bounce safely off the screen edge. Sometimes {name} gets bored and chases your cursor. Click the bed or drag {name} into it to stop wandering.</span>
+      {chasing && <div className="pet-chase-alert" role="status"><span aria-hidden="true">😤</span> PIP IS CHASING YOUR CURSOR! <span aria-hidden="true">Catch me!</span></div>}
+      {impact && <div className="pet-impact" style={{ left: impact.x, top: impact.y }} role="img" aria-label="Pip bounced safely off the screen edge">
+        <span className="pet-impact-burst" aria-hidden="true">✦</span><strong aria-hidden="true">BOING!</strong><span className="pet-impact-burst" aria-hidden="true">✦</span>
+      </div>}
       <button
         ref={bedRef}
         type="button"
@@ -223,7 +327,7 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
       <button
         ref={ref}
         type="button"
-        className={`roam-pet mood-${moodKey}${walking ? " is-walking" : ""}${dragging ? " is-dragging" : ""}${open ? " is-open" : ""}${tucked ? " is-tucked" : ""}`}
+        className={`roam-pet mood-${moodKey}${walking || chasing ? " is-walking" : ""}${dragging ? " is-dragging" : ""}${thrown ? " is-thrown" : ""}${chasing ? " is-chasing" : ""}${open ? " is-open" : ""}${tucked ? " is-tucked" : ""}`}
         style={{ transform: `translate3d(${tucked ? bedDock(bedPos).x : pos.x}px, ${tucked ? bedDock(bedPos).y : pos.y}px, 0)` }}
         aria-label={`${name}, a ${lookLabel}, ${tucked ? "tucked in bed" : "exploring"}. Click to open the care panel`}
         aria-describedby="roam-pet-help"

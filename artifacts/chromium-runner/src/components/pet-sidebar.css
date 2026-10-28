@@ -80,6 +80,9 @@
 .roam-pet:hover .roam-svg, .roam-pet:focus-visible .roam-svg { animation: roam-wiggle .5s ease-in-out infinite; }
 .roam-pet.is-walking .roam-svg { animation: roam-trot .32s ease-in-out infinite; }
 .roam-pet.is-dragging .roam-svg { animation: none; transform: rotate(-8deg) translateY(-4px); }
+.roam-pet.is-thrown .roam-svg { animation: pet-tumble .26s linear infinite; }
+.roam-pet.is-chasing { transition: transform .24s cubic-bezier(.2,.8,.3,1); filter: drop-shadow(0 0 7px rgba(243,119,73,.76)); }
+.roam-pet.is-chasing .roam-svg { animation: pet-chase .2s ease-in-out infinite alternate; }
 .roam-pet.mood-sleepy .roam-svg, .roam-pet.is-tucked .roam-svg { animation: pet-breathe 4s ease-in-out infinite; }
 .roam-pet.is-tucked { cursor: pointer; }
 .roam-z { position: absolute; right: -4px; top: -7px; color: #5d706c; font: 800 13px var(--app-font-sans); pointer-events: none; }
@@ -89,6 +92,35 @@
 @keyframes roam-wiggle { 25% { transform: rotate(-5deg); } 75% { transform: rotate(5deg); } }
 @keyframes roam-trot { 50% { transform: translateY(-3px); } }
 @keyframes roam-step { 50% { transform: translateY(-2px); } }
+@keyframes pet-tumble { to { transform: rotate(1turn) scale(.94, 1.06); } }
+@keyframes pet-chase { from { transform: rotate(-8deg) translateY(1px); } to { transform: rotate(8deg) translateY(-4px); } }
+.pet-chase-alert {
+  position: absolute; z-index: 2; top: max(82px, env(safe-area-inset-top)); left: 50%;
+  display: inline-flex; align-items: center; gap: 9px; max-width: calc(100vw - 24px);
+  padding: 10px 15px; border: 2px solid #fff1d2; border-radius: 999px;
+  color: #fffaf1; background: #b74637; box-shadow: 0 6px 24px rgba(113,36,28,.38);
+  font: 850 12px/1.2 var(--app-font-sans); letter-spacing: .045em; white-space: nowrap;
+  transform: translateX(-50%); animation: chase-alert .75s ease-in-out infinite alternate;
+}
+.pet-chase-alert span:first-child { font-size: 17px; }
+.pet-chase-alert span:last-child { color: #ffe39c; font-size: 10px; }
+@keyframes chase-alert { to { box-shadow: 0 8px 30px rgba(214,91,50,.58); transform: translateX(-50%) scale(1.035); } }
+.pet-impact {
+  position: absolute; z-index: 1; display: flex; align-items: center; gap: 4px;
+  color: #fff9e5; pointer-events: none; transform: translate(-50%, -50%);
+  animation: impact-pop .68s cubic-bezier(.18,.85,.35,1) both;
+}
+.pet-impact strong {
+  padding: 5px 8px; border: 2px solid #fff0b8; border-radius: 12px;
+  color: #5b2a20; background: #ffca58; box-shadow: 0 3px 10px rgba(67,39,20,.3);
+  font: 900 11px var(--app-font-sans); letter-spacing: .05em; transform: rotate(-8deg);
+}
+.pet-impact-burst { color: #ffca58; font-size: 19px; text-shadow: 0 1px 5px rgba(67,39,20,.35); }
+@keyframes impact-pop {
+  0% { opacity: 0; scale: .3; }
+  25% { opacity: 1; scale: 1.25; }
+  100% { opacity: 0; scale: .85; translate: 0 -16px; }
+}
 .pet-habitat svg { cursor: pointer; }
 .pet-habitat.is-game svg { cursor: default; }
 .pet-chase { transition: transform .45s cubic-bezier(.3,1.4,.5,1); }
@@ -169,7 +201,7 @@
 .pet-small-btn.is-game:hover { background: #173d3a; }
 @media (prefers-reduced-motion: reduce) {
   .roam-pet, .roam-body, .pet-chase { transition: none !important; }
-  .roam-svg, .pet-heart, .pet-acorn { animation: none !important; }
+  .roam-svg, .pet-heart, .pet-acorn, .pet-chase-alert, .pet-impact { animation: none !important; }
   .pet-heart { opacity: 0; }
 }
 
