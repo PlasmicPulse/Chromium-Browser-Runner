@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Bath, BedDouble, Carrot, Hand, Moon, Pencil, Sparkles, Timer, X } from "lucide-react";
+import { Bath, BedDouble, Carrot, Hand, Moon, Orbit, Pencil, RotateCw, Sparkles, Timer, X } from "lucide-react";
 import { RoamingPet } from "./roaming-pet";
 import { PET_APPEARANCES, PetSprite } from "./pet-appearance";
 import "./pet-sidebar.css";
@@ -260,6 +260,12 @@ export function PetSidebar() {
   const [game, setGame] = useState<{ on: boolean; score: number; left: number; ax: number; ay: number; best: number }>({ on: false, score: 0, left: 0, ax: 160, ay: 120, best: 0 });
   const [dx, setDx] = useState(0);
   const scoreRef = useRef(0);
+  const tossId = useRef(0);
+  const [playAction, setPlayAction] = useState<{ kind: "pinball" | "spin"; id: number } | null>(null);
+
+  const playToss = (kind: "pinball" | "spin") => {
+    setPlayAction({ kind, id: ++tossId.current });
+  };
 
   const update = useCallback((fn: (p: PetState) => PetState) => {
     setBox((b) => {
@@ -378,6 +384,7 @@ export function PetSidebar() {
         onToggleTucked={toggleBed}
         onDropInBed={() => update((p) => ({ ...p, tuckedAway: true }))}
         onLiftFromBed={() => update((p) => ({ ...p, tuckedAway: false }))}
+        playAction={playAction}
       />
       <Dialog.Portal>
         <Dialog.Content
@@ -425,6 +432,15 @@ export function PetSidebar() {
               </button>
               {game.best > 0 && <span className="pet-best" data-testid="text-pet-best">Best {game.best}</span>}
             </div>
+            <div className="pet-throw-row" role="group" aria-label="Playful tosses">
+              <button type="button" className="pet-small-btn" onClick={() => playToss("pinball")} data-testid="button-pet-pinball">
+                <Orbit size={12} /> Pinball launch
+              </button>
+              <button type="button" className="pet-small-btn" onClick={() => playToss("spin")} data-testid="button-pet-spin-toss">
+                <RotateCw size={12} /> Spinning toss
+              </button>
+            </div>
+            <p className="pet-hint">Just for fun. Tosses never change Pip’s care stats.</p>
             <p className="pet-hint">Tap {pet.name} in the hollow to pet. In Acorn chase, tap or press Enter on each acorn within 15 seconds; every catch lifts happiness and energy.</p>
             <div className="pet-looks" role="group" aria-label="Choose your pet's look" data-testid="group-pet-appearances">
               {PET_APPEARANCES.map((look) => (

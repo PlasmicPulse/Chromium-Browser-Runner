@@ -65,10 +65,11 @@ type Props = {
   onToggleTucked: () => void;
   onDropInBed: () => void;
   onLiftFromBed: () => void;
+  playAction: { kind: "pinball" | "spin"; id: number } | null;
 };
 
 export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingPet(
-  { name, moodKey, appearance, tucked, chaseEnabled, open, onOpen, onToggleTucked, onDropInBed, onLiftFromBed }, ref,
+  { name, moodKey, appearance, tucked, chaseEnabled, open, onOpen, onToggleTucked, onDropInBed, onLiftFromBed, playAction }, ref,
 ) {
   const [bedPos, setBedPos] = useState<Position>(readBed);
   const bedPosRef = useRef(bedPos);
@@ -81,6 +82,7 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
   const [bedDragging, setBedDragging] = useState(false);
   const [chasing, setChasing] = useState(false);
   const [thrown, setThrown] = useState(false);
+  const [spinToss, setSpinToss] = useState(false);
   const [impact, setImpact] = useState<WallImpact | null>(null);
   const [reduced, setReduced] = useState(() => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
   const [walking, setWalking] = useState(false);
@@ -206,10 +208,11 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
     window.clearTimeout(impactTimer.current);
   }, []);
 
-  const launch = useCallback((x: number, y: number, vx: number, vy: number) => {
+  const launch = useCallback((x: number, y: number, vx: number, vy: number, mode: "toss" | "pinball" | "spin" = "toss") => {
     if (throwRaf.current !== null) window.cancelAnimationFrame(throwRaf.current);
     setChasing(false);
     setThrown(true);
+    setSpinToss(mode === "spin");
     let px = x, py = y;
     let speedX = vx, speedY = vy;
     let previous = performance.now();
@@ -220,15 +223,18 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
       previous = now;
       px += speedX * scale;
       py += speedY * scale;
-      speedY += 0.24 * scale;
-      speedX *= Math.pow(0.993, scale);
-      speedY *= Math.pow(0.993, scale);
+      speedY += (mode === "pinball" ? 0.18 : 0.24) * scale;
+      const friction = mode === "pinball" ? 0.997 : 0.993;
+      speedX *= Math.pow(friction, scale);
+      speedY *= Math.pow(friction, scale);
+      const impactSpeed = Math.hypot(speedX, speedY);
       const maxX = Math.max(0, window.innerWidth - SIZE);
       const maxY = Math.max(0, window.innerHeight - SIZE);
       let hitEdge = false;
       let nx = 0, ny = 0;
-      if (px < 0 || px > maxX) { nx = px < 0 ? 1 : -1; px = Math.min(maxX, Math.max(0, px)); speedX *= -0.62; hitEdge = true; }
-      if (py < 0 || py > maxY) { ny = py < 0 ? 1 : -1; py = Math.min(maxY, Math.max(0, py)); speedY *= -0.62; hitEdge = true; }
+      const rebound = mode === "pinball" ? 0.86 : 0.62;
+      if (px < 0 || px > maxX) { nx = px < 0 ? 1 : -1; px = Math.min(maxX, Math.max(0, px)); speedX *= -rebound; hitEdge = true; }
+      if (py < 0 || py > maxY) { ny = py < 0 ? 1 : -1; py = Math.min(maxY, Math.max(0, py)); speedY *= -rebound; hitEdge = true; }
       const next = { x: px, y: py };
       posRef.current = next;
       setPos(next);
@@ -237,20 +243,30 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
         setImpact({
           x: nx === 1 ? 0 : nx === -1 ? window.innerWidth : px + SIZE / 2,
           y: ny === 1 ? 0 : ny === -1 ? window.innerHeight : py + SIZE / 2,
-          nx, ny, id: now,
+          nx, ny, id: now, speed: impactSpeed,
         });
         window.clearTimeout(impactTimer.current);
         impactTimer.current = window.setTimeout(() => setImpact(null), 850);
       }
-      if (now - started < 2400 && Math.hypot(speedX, speedY) > 0.8) {
+      if (now - started < (mode === "pinball" ? 3600 : 2400) && Math.hypot(speedX, speedY) > 0.8) {
         throwRaf.current = window.requestAnimationFrame(frame);
       } else {
         throwRaf.current = null;
         setThrown(false);
+        setSpinToss(false);
       }
     };
     throwRaf.current = window.requestAnimationFrame(frame);
   }, []);
+
+  useEffect(() => {
+    if (!playAction) return;
+    if (playAction.kind === "pinball") {
+      launch(posRef.current.x, posRef.current.y, -18, -13, "pinball");
+    } else {
+      launch(posRef.current.x, posRef.current.y, -7, -19, "spin");
+    }
+  }, [launch, playAction]);
 
   const onPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
     e.stopPropagation();
@@ -259,6 +275,7 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
       window.cancelAnimationFrame(throwRaf.current);
       throwRaf.current = null;
       setThrown(false);
+      setSpinToss(false);
     }
     setChasing(false);
     const rect = e.currentTarget.getBoundingClientRect();
@@ -367,8 +384,8 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
       <button
         ref={ref}
         type="button"
-        className={`roam-pet mood-${moodKey}${walking || chasing ? " is-walking" : ""}${dragging ? " is-dragging" : ""}${thrown ? " is-thrown" : ""}${chasing ? " is-chasing" : ""}${open ? " is-open" : ""}${tucked ? " is-tucked" : ""}`}
-        style={{ transform: `translate3d(${tucked ? bedDock(bedPos).x : pos.x}px, ${tucked ? bedDock(bedPos).y : pos.y}px, 0)` }}
+        className={`roam-pet mood-${moodKey}${walking || chasing ? " is-walking" : ""}${dragging ? " is-dragging" : ""}${thrown ? " is-thrown" : ""}${spinToss ? " is-spinning" : ""}${chasing ? " is-chasing" : ""}${open ? " is-open" : ""}${tucked ? " is-tucked" : ""}`}
+        style={{ transform: `translate3d(${tucked && !thrown ? bedDock(bedPos).x : pos.x}px, ${tucked && !thrown ? bedDock(bedPos).y : pos.y}px, 0)` }}
         aria-label={`${name}, a ${lookLabel}, ${tucked ? "tucked in bed" : "exploring"}. Click to open the care panel`}
         aria-describedby="roam-pet-help"
         aria-expanded={open}

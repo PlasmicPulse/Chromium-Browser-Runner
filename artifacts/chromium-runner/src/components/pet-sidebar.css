@@ -81,9 +81,11 @@
 .roam-pet.is-walking .roam-svg { animation: roam-trot .32s ease-in-out infinite; }
 .roam-pet.is-dragging .roam-svg { animation: none; transform: rotate(-8deg) translateY(-4px); }
 .roam-pet.is-thrown .roam-svg { animation: pet-tumble .26s linear infinite; }
+.roam-pet.is-spinning .roam-svg { animation: pet-tumble .16s linear infinite; }
 .roam-pet.is-chasing { transition: none; filter: drop-shadow(0 0 7px rgba(243,119,73,.76)); }
 .roam-pet.is-chasing .roam-svg { animation: pet-chase .2s ease-in-out infinite alternate; }
 .roam-pet.mood-sleepy .roam-svg, .roam-pet.is-tucked .roam-svg { animation: pet-breathe 4s ease-in-out infinite; }
+.roam-pet.is-thrown .roam-svg, .roam-pet.is-spinning .roam-svg { animation: pet-tumble .2s linear infinite; }
 .roam-pet.is-tucked { cursor: pointer; }
 .roam-z { position: absolute; right: -4px; top: -7px; color: #5d706c; font: 800 13px var(--app-font-sans); pointer-events: none; }
 .roam-shadow { position: absolute; left: 10px; right: 10px; bottom: 2px; height: 6px; border-radius: 50%; background: rgba(41,59,61,.18); }
@@ -125,6 +127,8 @@
 .pet-scoreboard { position: absolute; left: 8px; right: 8px; top: 8px; display: flex; justify-content: space-between; font: 700 10px var(--app-font-mono); color: #315e51; pointer-events: none; }
 .pet-scoreboard span { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 99px; background: #f7f6ee; }
 .pet-game-row { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.pet-throw-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.pet-throw-row .pet-small-btn { flex: 1 1 auto; justify-content: center; }
 .pet-small-btn.is-game { background: #315e51; border-color: #315e51; color: #f3f1e8; }
 .pet-small-btn.is-game:hover { background: #285d54; }
 .pet-small-btn:disabled { opacity: .5; cursor: default; }
@@ -189,7 +193,7 @@
 .pet-small-btn.is-game:hover { background: #173d3a; }
 @media (prefers-reduced-motion: reduce) {
   .roam-pet, .roam-body, .pet-chase { transition: none !important; }
-  .roam-svg, .pet-heart, .pet-acorn, .pet-chase-alert, .pet-impact { animation: none !important; }
+  .roam-svg, .roam-pet.is-spinning .roam-svg, .pet-heart, .pet-acorn, .pet-chase-alert, .pet-impact { animation: none !important; }
   .pet-heart { opacity: 0; }
 }
 
