@@ -7,3 +7,4 @@
 - [Chat identity](chat-identity.md) — Display names are unverified and may collide; matching names do not establish sender identity or message ownership.
 - [PostgreSQL pagination](postgres-pagination.md) — Preserve timestamp microseconds in cursors; explicitly type query rows to avoid cursor-inference and overload traps.
 - [Pet parking](pet-parking.md) — Parking is independent of care/rest; movable beds must remain reachable and dock correctly near screen edges.
+- [Consent-gated verification](consent-gated-verification.md) — A preview capture of the consent screen does not verify interactions behind it.

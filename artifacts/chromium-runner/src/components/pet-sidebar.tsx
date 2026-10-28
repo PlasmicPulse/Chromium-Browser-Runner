@@ -372,6 +372,7 @@ export function PetSidebar() {
         moodKey={m.key}
         appearance={pet.appearance}
         tucked={pet.tuckedAway}
+        chaseEnabled={pet.chaseEnabled}
         open={open}
         onOpen={() => setOpen(true)}
         onToggleTucked={toggleBed}
@@ -514,7 +515,9 @@ export function PetSidebar() {
               <button type="button" className="pet-action" aria-pressed={pet.resting} onClick={() => act("rest")} data-testid="button-pet-rest"><Moon size={15} /> {pet.resting ? "Wake" : "Rest"}</button>
               <button type="button" className="pet-action" onClick={() => act("clean")} data-testid="button-pet-clean"><Bath size={15} /> Clean</button>
               <button type="button" className="pet-action pet-action-bed" aria-pressed={pet.tuckedAway} onClick={toggleBed} data-testid="button-pet-tuck"><BedDouble size={15} /> {pet.tuckedAway ? "Let wander" : "Tuck into bed"}</button>
+              <button type="button" className="pet-action pet-action-bed" role="switch" aria-checked={pet.chaseEnabled} aria-label="Surprise cursor chase" onClick={() => update((p) => ({ ...p, chaseEnabled: !p.chaseEnabled }))} data-testid="button-pet-chase-toggle"><Timer size={15} /> Cursor chase: {pet.chaseEnabled ? "On" : "Off"}</button>
             </div>
+            <p className="pet-hint">When enabled, {pet.name} may chase your cursor about every five minutes while awake and wandering. Turn it off for quieter browsing.</p>
             <p className="pet-note" data-testid="text-pet-storage">
               {stored
                 ? <><strong>Pet saved on this browser only.</strong> {pet.name} lives in local storage, not on the server. Stats drift slowly while you're away, but never hit zero. Required site activity logging still applies.</>

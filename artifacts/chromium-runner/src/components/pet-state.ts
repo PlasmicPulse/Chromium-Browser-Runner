@@ -55,6 +55,7 @@ export type PetState = PetStats & {
   resting: boolean;
   appearance: PetAppearance;
   tuckedAway: boolean;
+  chaseEnabled: boolean;
   roomBackground: PetRoomBackground;
   furniture: PetFurniture[];
   furniturePositions: Partial<Record<PetFurniture, PetFurniturePosition>>;
@@ -72,7 +73,7 @@ export const clamp = (n: number) => Math.min(100, Math.max(FLOOR, n));
 export function defaultPet(now = Date.now()): PetState {
   return {
     version: 1, name: "Pip", hunger: 78, happiness: 82, energy: 71, hygiene: 86,
-    updatedAt: now, resting: false, appearance: "hedgehog", tuckedAway: false,
+    updatedAt: now, resting: false, appearance: "hedgehog", tuckedAway: false, chaseEnabled: true,
     roomBackground: "fern", furniture: [], furniturePositions: {},
   };
 }
@@ -103,6 +104,7 @@ export function validate(raw: unknown, now = Date.now()): PetState {
     resting: r.resting === true,
     appearance: isPetAppearance(r.appearance) ? r.appearance : d.appearance,
     tuckedAway: r.tuckedAway === true,
+    chaseEnabled: r.chaseEnabled !== false,
     roomBackground: isPetRoomBackground(r.roomBackground) ? r.roomBackground : d.roomBackground,
     furniture: Array.isArray(r.furniture) ? [...new Set(r.furniture.filter(isPetFurniture))] : d.furniture,
     furniturePositions: normalizeFurniturePositions(r.furniturePositions),
