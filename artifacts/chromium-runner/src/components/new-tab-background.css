@@ -1,0 +1,40 @@
+.ntb-settings { display: grid; gap: 8px; }
+.ntb-head strong { display: block; font-size: 12px; }
+.ntb-head small { display: block; margin-top: 2px; font-size: 10px; line-height: 1.4; opacity: .75; }
+.ntb-preview { position: relative; display: grid; place-items: center; height: 92px; overflow: hidden; border: 1px solid #c6d8ce; border-radius: 10px; background: #dfe9e2 radial-gradient(#c4d3cb .7px, transparent .7px) 0 0 / 12px 12px; color: #5b766e; font-size: 10px; }
+.ntb-preview img { width: 100%; height: 100%; object-fit: cover; }
+.ntb-preview.fit-contain img { object-fit: contain; }
+.ntb-working { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 6px; background: rgba(240,246,241,.82); color: #173536; font-weight: 700; }
+.ntb-meta { margin: 0; font: 9px var(--app-font-mono); opacity: .7; }
+.ntb-file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.ntb-actions { display: flex; gap: 6px; }
+.ntb-button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 32px; padding: 0 8px; border: 1px solid #1e4e48; border-radius: 8px; color: #f5f8f3; background: #1e4e48; font-size: 11px; font-weight: 700; cursor: pointer; }
+.ntb-button.is-quiet { color: #315b54; background: transparent; border-color: #bfd0c8; }
+.ntb-button:disabled { opacity: .45; cursor: not-allowed; }
+.ntb-fit { display: flex; padding: 3px; border: 1px solid #c6d8ce; border-radius: 9px; }
+.ntb-fit label { flex: 1; display: grid; place-items: center; padding: 5px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; }
+.ntb-fit label.is-on { color: #173536; background: #c9f36a; }
+.ntb-fit input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.ntb-fit label:focus-within { outline: 2px solid #ef7058; outline-offset: 1px; }
+.ntb-error { display: flex; gap: 6px; align-items: flex-start; margin: 0; padding: 7px 8px; border: 1px solid #e7c4b8; border-radius: 8px; color: #984b40; background: #fff1eb; font-size: 10px; line-height: 1.4; }
+.ntb-error span { flex: 1; }
+.ntb-error button { border: 0; background: transparent; color: inherit; cursor: pointer; }
+.ntb-status { margin: 0; font-size: 10px; color: #3f805e; }
+.dark .ntb-preview { border-color: #355756; background-color: #1a393b; color: #a9c0b5; }
+.dark .ntb-working { background: rgba(19,46,48,.85); color: #e5eee8; }
+.dark .ntb-button { border-color: #c9f36a; color: #173536; background: #c9f36a; }
+.dark .ntb-button.is-quiet { color: #d0dfd6; background: transparent; border-color: #456361; }
+.dark .ntb-fit { border-color: #355756; }
+.dark .ntb-status { color: #8fc496; }
+.dark .ntb-error { color: #ffd6cb; background: #4a2a26; border-color: #7a4339; }
+
+/* New-tab empty screen photo; only rendered when no remote frame is present. */
+.newtab-photo { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; user-select: none; }
+.newtab-photo.fit-contain { object-fit: contain; }
+.remote-viewport.has-photo { background-image: none; background-color: #1d3133; }
+.remote-viewport.has-photo .viewport-empty { position: relative; z-index: 1; padding: 22px 26px; border: 1px solid rgba(255,255,255,.55); border-radius: 18px; background: rgba(244,248,241,.86); box-shadow: 0 12px 40px rgba(10,30,30,.28); backdrop-filter: blur(10px) saturate(1.1); }
+.dark .remote-viewport.has-photo .viewport-empty { border-color: rgba(201,243,106,.18); background: rgba(19,46,48,.86); }
+@supports not (backdrop-filter: blur(1px)) {
+  .remote-viewport.has-photo .viewport-empty { background: rgba(244,248,241,.96); }
+  .dark .remote-viewport.has-photo .viewport-empty { background: rgba(19,46,48,.96); }
+}

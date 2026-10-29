@@ -142,6 +142,30 @@ export const SendChatMessageResponse = zod.object({
 
 
 /**
+ * @summary Save this consenting browser's chosen chat name
+ */
+export const setChatNameBodyUsernameMax = 24;
+
+
+export const setChatNameBodyUsernameRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+
+
+export const SetChatNameBody = zod.object({
+  "username": zod.string().min(1).max(setChatNameBodyUsernameMax).regex(setChatNameBodyUsernameRegExp)
+})
+
+export const setChatNameResponseUsernameMax = 24;
+
+
+export const setChatNameResponseUsernameRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+
+
+export const SetChatNameResponse = zod.object({
+  "username": zod.string().min(1).max(setChatNameResponseUsernameMax).regex(setChatNameResponseUsernameRegExp)
+})
+
+
+/**
  * Returns server health status
  * @summary Health check
  */

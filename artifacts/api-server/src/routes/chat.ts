@@ -1,11 +1,29 @@
 import { Router, type IRouter } from "express";
-import { ListChatMessagesResponse, SendChatMessageBody, SendChatMessageResponse } from "@workspace/api-zod";
-import { listMessages, saveMessage } from "../lib/chat-store";
+import { ListChatMessagesResponse, SendChatMessageBody, SendChatMessageResponse, SetChatNameBody, SetChatNameResponse } from "@workspace/api-zod";
+import { listMessages, saveMessage, saveChosenName } from "../lib/chat-store";
+import { requireSameOrigin } from "../middlewares/same-origin";
 import { deviceIdFromToken, requestDeviceToken } from "../lib/visitor-activity";
 import { requireActivityAcceptance } from "../middlewares/activity-access";
 
 const router: IRouter = Router();
 const recent = new Map<string, number>();
+
+router.put("/chat/name", requireSameOrigin, requireActivityAcceptance, async (req, res): Promise<void> => {
+  const parsed = SetChatNameBody.safeParse({
+    username: typeof req.body?.username === "string" ? req.body.username.trim() : req.body?.username,
+  });
+  if (!parsed.success) {
+    res.status(400).json({ error: "Use 1–24 letters, numbers, underscores or hyphens." });
+    return;
+  }
+  const saved = await saveChosenName(parsed.data.username, requestDeviceToken(req));
+  if (!saved) {
+    res.status(403).json({ error: "Activity logging acceptance is required to save a name." });
+    return;
+  }
+  res.setHeader("Cache-Control", "private, no-store");
+  res.json(SetChatNameResponse.parse(saved));
+});
 
 router.get("/chat", requireActivityAcceptance, async (_req, res): Promise<void> => {
   res.setHeader("Cache-Control", "no-store");

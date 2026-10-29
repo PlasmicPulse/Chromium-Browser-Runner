@@ -100,7 +100,7 @@ function Dashboard() {
       <section className="owner-downloads">
         <a className="owner-dl" href={getDownloadChatLogUrl()} download data-testid="link-download-chat"><Download size={15} /> Chat log (.txt)</a>
         <a className="owner-dl" href={getDownloadVisitLogUrl()} download data-testid="link-download-visits"><Download size={15} /> Visit log (.txt)</a>
-        <p>Times in text files are UTC. Browser IDs match across the chat log, visit log and this list. Chats sent before this feature, or by browsers that did not opt in, have no ID and are not attributed retroactively.</p>
+        <p>Times in text files are UTC. Browser IDs match across the chat log, visit log and this list. Visit logs include the browser’s latest chosen chat name at export time, including for earlier visits; names are unverified and may change or match other visitors. Unnamed browsers show null. Chats sent before this feature, or by browsers that did not opt in, have no ID and are not attributed retroactively.</p>
       </section>
 
       <div className="owner-bar">

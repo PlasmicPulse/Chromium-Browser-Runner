@@ -2,7 +2,7 @@ import type { Response } from "express";
 import { pool } from "@workspace/db";
 
 type ActivityExportRow = { id: number; device_id: string; created_at: Date } & (
-  { username: string; message: string } | { address: string; cursor_time: string }
+  { username: string; message: string } | { address: string; cursor_time: string; username: string | null }
 );
 
 async function write(res: Response, text: string): Promise<void> {
@@ -39,7 +39,10 @@ export async function exportActivity(res: Response, kind: "chat" | "visits"): Pr
     "All timestamps are UTC. Only activity recorded after explicit opt-in is included.",
     "Device IDs identify consenting browser profiles, not a verified person or physical device.",
     chat ? "Messages are JSON-escaped to preserve one record per line." : "Addresses exclude credentials, query strings, and fragments.",
-    ...(chat ? [] : ["Visit order: newest to oldest."]),
+    ...(chat ? [] : [
+      "Visit order: newest to oldest.",
+      "current_username is the browser profile's latest self-chosen name at export time, not a verified identity or a name recorded at the time of the visit. null means no name chosen.",
+    ]),
     "Stopping logging prevents future entries; previously recorded entries remain.",
     "",
   ].join("\n") + "\n");
@@ -51,9 +54,10 @@ export async function exportActivity(res: Response, kind: "chat" | "visits"): Pr
       chat
         ? `SELECT id, device_id, created_at, username, message FROM chat_messages
            WHERE id > $1 AND id <= $2 AND device_id IS NOT NULL ORDER BY id LIMIT 500`
-        : `SELECT id, device_id, created_at, created_at::text AS cursor_time, address FROM page_visits
-           WHERE id <= $3 AND ($1::timestamptz IS NULL OR (created_at, id) < ($1::timestamptz, $2::bigint))
-           ORDER BY created_at DESC, id DESC LIMIT 500`,
+        : `SELECT v.id, v.device_id, v.created_at, v.created_at::text AS cursor_time, v.address, d.username
+           FROM page_visits v LEFT JOIN visitor_devices d ON d.device_id = v.device_id
+           WHERE v.id <= $3 AND ($1::timestamptz IS NULL OR (v.created_at, v.id) < ($1::timestamptz, $2::bigint))
+           ORDER BY v.created_at DESC, v.id DESC LIMIT 500`,
       chat ? [cursor, maxId] : [visitCursor, cursor, maxId],
     );
     if (!result.rows.length) break;
@@ -61,7 +65,7 @@ export async function exportActivity(res: Response, kind: "chat" | "visits"): Pr
       const common = `[${row.created_at.toISOString()}] device=${row.device_id}`;
       return "message" in row
         ? `${common} username=${logField(row.username)} message=${logField(row.message)}`
-        : `${common} address=${logField(row.address)}`;
+        : `${common} current_username=${row.username === null ? "null" : logField(row.username)} address=${logField(row.address)}`;
     });
     const last = result.rows[result.rows.length - 1];
     cursor = last.id;

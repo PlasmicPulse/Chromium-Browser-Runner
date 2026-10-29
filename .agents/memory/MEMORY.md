@@ -9,3 +9,4 @@
 - [Pet parking](pet-parking.md) — Parking is independent of care/rest; movable beds must remain reachable and dock correctly near screen edges.
 - [Consent-gated verification](consent-gated-verification.md) — A preview capture of the consent screen does not verify interactions behind it.
 - [Pip play constraints](pip-play.md) — Rough play is figurative, never destructive or a happiness penalty; avoid comic sound-effect text and protect browser responsiveness.
+- [Background photo storage](background-photo-storage.md) — Background photos must stay in the visitor's current browser, without cloud uploads or cross-device sync.

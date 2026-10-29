@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getListChatMessagesQueryKey, listChatMessages, sendChatMessage, type ChatMessage, type ChatMessageInput } from '@workspace/api-client-react';
+import { getListChatMessagesQueryKey, listChatMessages, sendChatMessage, setChatName, type ChatMessage, type ChatMessageInput } from '@workspace/api-client-react';
 import { ArrowRight, MessageCircle, Pencil, Send } from 'lucide-react';
 import { useActivityConsent } from '@/lib/activity-consent';
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -124,6 +124,7 @@ function ChatRoom({ username, chooseName, ownIdsRef, onHistoryVisibilityChange }
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const keepBottom = useRef(true);
   const client = useQueryClient();
+  const nameSave = useMutation({ mutationFn: (username: string) => setChatName({ username }) });
   const key = getListChatMessagesQueryKey();
   const history = useQuery({
     queryKey: key,
@@ -169,11 +170,18 @@ function ChatRoom({ username, chooseName, ownIdsRef, onHistoryVisibilityChange }
     input.style.height = `${Math.min(input.scrollHeight, 112)}px`;
   }, [message, editingName]);
 
-  function submitName(event: FormEvent) {
+  async function submitName(event: FormEvent) {
     event.preventDefault();
+    if (nameSave.isPending) return;
     const next = draftName.trim();
     if (!validChatName(next)) {
       setValidationError('Use 1–24 letters, numbers, underscores or hyphens.');
+      return;
+    }
+    try {
+      await nameSave.mutateAsync(next);
+    } catch {
+      setValidationError('Could not save your name. Check your connection and activity consent, then try again.');
       return;
     }
     chooseName(next);
@@ -194,18 +202,19 @@ function ChatRoom({ username, chooseName, ownIdsRef, onHistoryVisibilityChange }
     return (
       <div className="chat-name-screen">
         <h3>{username ? 'Change your name' : 'What should we call you?'}</h3>
-        <p>Choose the name everyone will see when you send a message.</p>
+        <p>Choose the name everyone will see when you send a message. Saving also links this name to this browser’s visits in the owner’s private logs, including earlier visits. It is a display name, not a verified identity.</p>
         <form className="chat-name-form" onSubmit={submitName}>
           <label htmlFor="chat-username">Your name</label>
           <input id="chat-username" value={draftName} maxLength={24} autoComplete="nickname"
+            disabled={nameSave.isPending}
             placeholder="Choose a name" autoFocus required
             onChange={event => { setDraftName(event.target.value); setValidationError(''); }} />
           <span className="chat-muted">1–24 letters, numbers, underscores or hyphens.</span>
           {validationError && <p className="chat-error" role="alert">{validationError}</p>}
-          <button type="submit" className="chat-join" disabled={!draftName.trim()}>
-            {username ? 'Save name' : 'Continue to chat'}<ArrowRight size={16} />
+          <button type="submit" className="chat-join" disabled={!draftName.trim() || nameSave.isPending}>
+            {nameSave.isPending ? 'Saving…' : username ? 'Save name' : 'Continue to chat'}<ArrowRight size={16} />
           </button>
-          {username && <button type="button" className="chat-name-cancel" onClick={() => { setValidationError(''); setEditingName(false); }}>Cancel</button>}
+          {username && <button type="button" className="chat-name-cancel" disabled={nameSave.isPending} onClick={() => { setValidationError(''); setEditingName(false); }}>Cancel</button>}
         </form>
         <ChatDisclosure />
       </div>

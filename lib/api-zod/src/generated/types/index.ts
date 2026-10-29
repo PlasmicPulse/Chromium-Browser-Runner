@@ -13,6 +13,7 @@ export * from './browserRunInput';
 export * from './browserRunResult';
 export * from './chatMessage';
 export * from './chatMessageInput';
+export * from './chatNameInput';
 export * from './deviceReviewInput';
 export * from './healthStatus';
 export * from './listVisitorDevicesParams';

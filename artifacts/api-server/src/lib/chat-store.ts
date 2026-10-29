@@ -13,6 +13,16 @@ export async function initializeChat(): Promise<void> {
 
 const columns = `id, username, message, created_at AS "createdAt"`;
 
+export async function saveChosenName(username: string, trackingToken: string | null) {
+  const deviceId = deviceIdFromToken(trackingToken);
+  const result = await pool.query(
+    `UPDATE visitor_devices SET username = $1, last_seen = now()
+     WHERE device_id = $2 AND consent_active = true RETURNING username`,
+    [username, deviceId],
+  );
+  return result.rows[0] ?? null;
+}
+
 export async function listMessages() {
   const result = await pool.query(`SELECT ${columns} FROM chat_messages ORDER BY id DESC LIMIT 50`);
   return result.rows.reverse().map(row => ({ ...row, createdAt: row.createdAt.toISOString() }));

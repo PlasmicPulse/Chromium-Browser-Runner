@@ -183,6 +183,28 @@ paths:
           description: Invalid username or message
         "429":
           description: Please wait before sending again
+  /chat/name:
+    put:
+      operationId: setChatName
+      tags: [chat]
+      summary: Save this consenting browser's chosen chat name
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatNameInput"
+      responses:
+        "200":
+          description: Name saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatNameInput"
+        "400":
+          description: Invalid name
+        "403":
+          description: Activity consent or same-origin check failed
   /healthz:
     get:
       operationId: healthCheck
@@ -241,6 +263,15 @@ paths:
                 $ref: "#/components/schemas/BrowserError"
 components:
   schemas:
+    ChatNameInput:
+      type: object
+      required: [username]
+      properties:
+        username:
+          type: string
+          minLength: 1
+          maxLength: 24
+          pattern: '^[A-Za-z0-9_-]+$'
     ActivityConsentInput:
       type: object
       required: [enabled]

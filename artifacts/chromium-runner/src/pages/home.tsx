@@ -11,6 +11,9 @@ import { BrowserTools } from '@/components/browser-tools';
 import { BookmarkPanel } from '@/components/bookmark-panel';
 import { createBookmark, loadBookmarks, saveBookmarks, type Bookmark } from '@/components/bookmark-storage';
 import { useThemePreference } from '@/lib/theme-preference';
+import { useNewTabBackground } from '@/lib/new-tab-background';
+import { NewTabBackgroundSettings } from '@/components/new-tab-background-settings';
+import '@/components/new-tab-background.css';
 import {
   AlertCircle, ArrowLeft, ArrowRight, Bookmark as BookmarkIcon, BookmarkCheck, ExternalLink, Globe2, LoaderCircle,
   LockKeyhole, Moon, Radio, RotateCw, ShieldCheck, Sun, Trash2, X, Maximize2, Minimize2, UserCog,
@@ -68,6 +71,7 @@ function getOrCreateProfileToken(): string {
 export default function Home() {
   const { consent, refetch: refreshAcceptance } = useActivityConsent();
   const { darkMode, toggleDarkMode } = useThemePreference();
+  const newTabBackground = useNewTabBackground();
   const trackingTokenRef = useRef<string | null>(null);
   trackingTokenRef.current = consent?.enabled ? consent.token : null;
   const [address, setAddress] = useState('');
@@ -448,6 +452,7 @@ export default function Home() {
                 <input type="color" aria-label="Search bar color" value={addressColor} onChange={(event) => changeAddressColor(event.target.value)} data-testid="input-address-color" />
               </label>
               <button type="button" className="tools-color-reset" onClick={() => changeAddressColor(DEFAULT_ADDRESS_COLOR)} data-testid="button-address-color-reset">Reset color</button>
+              <NewTabBackgroundSettings background={newTabBackground} />
             </section>
             <section className="tools-section" aria-label="Session and settings">
               <h3>Session &amp; settings</h3>
@@ -494,7 +499,7 @@ export default function Home() {
             </div>
 
             <div
-              className={`remote-viewport ${frame ? 'has-frame' : ''}`}
+              className={`remote-viewport ${frame ? 'has-frame' : ''}${!frame && newTabBackground.url ? ' has-photo' : ''}`}
               ref={viewportRef}
               tabIndex={frame ? 0 : -1}
               role="application"
@@ -539,6 +544,9 @@ export default function Home() {
                   draggable={false}
                   data-testid="img-browser-frame"
                 />
+              )}
+              {!frame && newTabBackground.url && (
+                <img className={`newtab-photo fit-${newTabBackground.fit}`} src={newTabBackground.url} alt="" draggable={false} data-testid="img-newtab-background" />
               )}
               {!frame && (
                 <div className={`viewport-empty ${busy ? 'is-busy' : ''}`} aria-live="polite">

@@ -5,6 +5,15 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface ChatNameInput {
+  /**
+     * @minLength 1
+     * @maxLength 24
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  username: string;
+}
+
 export interface ActivityConsentInput {
   enabled: boolean;
 }

@@ -1,19 +1,24 @@
 import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 
 export type WallImpact = { x: number; y: number; nx: number; ny: number; id: number; speed: number };
 
 const SIZE = 180;
 const COLORS = ["#d5c9ae", "#8f9896", "#e7e5dc", "#677573"];
 
-/** Canvas keeps a wall collision to one animated element instead of dozens of DOM nodes. */
+/**
+ * Canvas keeps a wall collision to one animated element instead of dozens of DOM nodes.
+ * Drawn at the real screen-edge impact point, portaled above the browser frame
+ * (including maximized mode) and constrained only to the app viewport.
+ */
 export function PetImpact({ impact }: { impact: WallImpact }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const viewportRect = document.querySelector<HTMLElement>(".remote-viewport")?.getBoundingClientRect()
-    ?? new DOMRect(0, 0, window.innerWidth, window.innerHeight);
-  const effectX = Math.min(viewportRect.right, Math.max(viewportRect.left, impact.x));
-  const effectY = Math.min(viewportRect.bottom, Math.max(viewportRect.top, impact.y));
-  const left = Math.min(Math.max(0, window.innerWidth - SIZE), Math.max(0, effectX - SIZE / 2));
-  const top = Math.min(Math.max(0, window.innerHeight - SIZE), Math.max(0, effectY - SIZE / 2));
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const effectX = Math.min(vw, Math.max(0, impact.x));
+  const effectY = Math.min(vh, Math.max(0, impact.y));
+  const left = Math.min(Math.max(0, vw - SIZE), Math.max(0, effectX - SIZE / 2));
+  const top = Math.min(Math.max(0, vh - SIZE), Math.max(0, effectY - SIZE / 2));
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -34,7 +39,6 @@ export function PetImpact({ impact }: { impact: WallImpact }) {
       const angle = along + (Math.random() - 0.5) * 2.15;
       const speed = (0.6 + intensity * 3.8) * (0.65 + Math.random() * 0.7);
       return {
-        x, y,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed - 0.35,
         size: Math.min(8, 1.5 + intensity * 4.8 + Math.random() * (1 + intensity * 2)),
@@ -44,16 +48,8 @@ export function PetImpact({ impact }: { impact: WallImpact }) {
       };
     });
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const clipLeft = Math.max(0, viewportRect.left - left);
-    const clipTop = Math.max(0, viewportRect.top - top);
-    const clipRight = Math.min(SIZE, viewportRect.right - left);
-    const clipBottom = Math.min(SIZE, viewportRect.bottom - top);
-    if (clipRight <= clipLeft || clipBottom <= clipTop) return;
-    context.beginPath();
-    context.rect(clipLeft, clipTop, clipRight - clipLeft, clipBottom - clipTop);
-    context.clip();
 
-    // Animate the content, plus one small browser viewport shake.
+    // One small shake, applied only to the remote viewport.
     const shake = reduceMotion
       ? null
       : document.querySelector<HTMLElement>(".remote-viewport")?.animate([
@@ -93,9 +89,8 @@ export function PetImpact({ impact }: { impact: WallImpact }) {
         const drag = Math.pow(0.984, elapsed / 16.7);
         const px = x + particle.vx * elapsed / 16.7 * drag;
         const py = y + particle.vy * elapsed / 16.7 * drag + 0.0018 * elapsed * elapsed / 16.7;
-        const alpha = 1 - progress;
         context.save();
-        context.globalAlpha = alpha;
+        context.globalAlpha = 1 - progress;
         context.translate(px, py);
         context.rotate(particle.angle + particle.spin * elapsed / 16.7);
         context.fillStyle = particle.color;
@@ -116,11 +111,12 @@ export function PetImpact({ impact }: { impact: WallImpact }) {
       window.cancelAnimationFrame(frame);
       shake?.cancel();
     };
-  }, [impact, left, top]);
+  }, [impact, left, top, effectX, effectY]);
 
-  return (
+  return createPortal(
     <div className="pet-impact" style={{ left, top }} data-testid="effect-pet-wall-impact" aria-hidden="true">
       <canvas ref={canvasRef} className="pet-impact-canvas" width={SIZE} height={SIZE} />
-    </div>
+    </div>,
+    document.body,
   );
 }
