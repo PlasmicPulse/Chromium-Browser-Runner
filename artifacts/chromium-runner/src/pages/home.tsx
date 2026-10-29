@@ -14,6 +14,9 @@ import { useThemePreference } from '@/lib/theme-preference';
 import { useNewTabBackground } from '@/lib/new-tab-background';
 import { NewTabBackgroundSettings } from '@/components/new-tab-background-settings';
 import '@/components/new-tab-background.css';
+import { useMusicPlayer } from '@/lib/use-music-player';
+import { MusicPanel } from '@/components/music-panel';
+import { MusicMini } from '@/components/music-mini';
 import {
   AlertCircle, ArrowLeft, ArrowRight, Bookmark as BookmarkIcon, BookmarkCheck, ExternalLink, Globe2, LoaderCircle,
   LockKeyhole, Moon, Radio, RotateCw, ShieldCheck, Sun, Trash2, X, Maximize2, Minimize2, UserCog,
@@ -72,6 +75,7 @@ export default function Home() {
   const { consent, refetch: refreshAcceptance } = useActivityConsent();
   const { darkMode, toggleDarkMode } = useThemePreference();
   const newTabBackground = useNewTabBackground();
+  const music = useMusicPlayer();
   const trackingTokenRef = useRef<string | null>(null);
   trackingTokenRef.current = consent?.enabled ? consent.token : null;
   const [address, setAddress] = useState('');
@@ -432,6 +436,10 @@ export default function Home() {
               <h3>Bookmarks</h3>
               <BookmarkPanel bookmarks={bookmarks} onOpen={openBookmark} onRemove={removeBookmark} />
             </section>
+            <section className="tools-section" aria-label="Music">
+              <h3>Music</h3>
+              <MusicPanel music={music} />
+            </section>
             <section className="tools-section" aria-label="Appearance">
               <h3>Appearance</h3>
               <button
@@ -475,6 +483,7 @@ export default function Home() {
             </section>
           </BrowserTools>
           <PetSidebar />
+          <MusicMini music={music} />
           {(addressError || socketError) && (
             <div className="inline-alert" role="alert" data-testid={addressError ? 'text-address-error' : 'status-browser-error'}>
               <AlertCircle size={14} /><span>{addressError || socketError}</span>

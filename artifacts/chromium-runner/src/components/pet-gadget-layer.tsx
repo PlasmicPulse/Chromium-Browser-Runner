@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
-import { GADGETS, type GadgetPoint, type GadgetTool } from "./pet-gadgets";
+import { GADGETS, isPower, type GadgetPoint, type GadgetTool, type PowerTool } from "./pet-gadgets";
+import { MAX_POWERS, spawnPower, stepPower, VORTEX_RANGE, type Power } from "./pet-powers";
 import "./pet-gadgets.css";
 
 type Props = {
@@ -11,30 +12,37 @@ type Props = {
   onBallHit: (vx: number, vy: number) => void;
   onBonk: () => void;
   onBlast: (x: number, y: number) => boolean;
-  onStickThrown: (to: GadgetPoint) => void;
+  onKnock: (vx: number, vy: number, mode: "toss" | "pinball") => void;
   onCancel: () => void;
 };
 
 type Ball = { x: number; y: number; vx: number; vy: number; born: number; hit: boolean; fx?: number; fy?: number; still?: boolean };
 type Particle = { a: number; s: number; size: number; color: string; spin: number };
 type Blast = { x: number; y: number; born: number; fired: boolean; parts: Particle[] };
-type Stick = { from: GadgetPoint; to: GadgetPoint; born: number };
+type Ring = { x: number; y: number; born: number; hit: boolean };
 
-const MAX_BALLS = 6, MAX_BLASTS = 3, BLAST_RANGE = 150, DROP_MS = 380, BOOM_MS = 750, STICK_MS = 650;
+const MAX_BALLS = 6, MAX_BLASTS = 3, MAX_RINGS = 6, BLAST_RANGE = 150, DROP_MS = 380, BOOM_MS = 750;
 const COLORS = ["#ef7058", "#f4d06f", "#c9f36a", "#7fc8c2", "#f3a6b8"];
 const origin = (): GadgetPoint => ({ x: window.innerWidth / 2, y: window.innerHeight - 46 });
+const POWER_TEXT: Record<PowerTool, [string, string]> = {
+  beam: ["The beam connects. {n} rockets across the screen.", "The beam goes wide. Line it up with {n}."],
+  vortex: ["The well collapses and slings {n} into orbit.", "{n} was outside the ring. Open it closer."],
+  lightning: ["The bolt lands and launches {n} skyward.", "The bolt lands. {n} was out of reach."],
+};
 
 export function PetGadgetLayer(props: Props) {
   const { tool, name, reduced } = props;
   const cb = useRef(props); cb.current = props;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const malletRef = useRef<HTMLSpanElement>(null);
   const aim = useRef<GadgetPoint>({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
   const down = useRef<GadgetPoint | null>(null);
   const balls = useRef<Ball[]>([]);
   const blasts = useRef<Blast[]>([]);
-  const sticks = useRef<Stick[]>([]);
-  const [mallet, setMallet] = useState<{ x: number; y: number; id: number } | null>(null);
+  const powers = useRef<Power[]>([]);
+  const rings = useRef<Ring[]>([]);
+  const [swing, setSwing] = useState(0);
   const [status, setStatus] = useState("");
   const bonkTimer = useRef<number | undefined>(undefined);
   const burstTimer = useRef<number | undefined>(undefined);
@@ -42,7 +50,26 @@ export function PetGadgetLayer(props: Props) {
   const info = GADGETS.find((g) => g.id === tool)!;
   const Icon = info.icon;
 
-  useEffect(() => { overlayRef.current?.focus({ preventScroll: true }); setStatus(""); }, [tool]);
+  const petCenter = () => {
+    const r = cb.current.getPetRect();
+    return r ? { x: r.x + r.width / 2, y: r.y + r.height / 2, r: r.width / 2 } : null;
+  };
+  const placeMallet = (at: GadgetPoint, visible = true) => {
+    const el = malletRef.current;
+    if (!el) return;
+    el.style.transform = `translate3d(${at.x}px, ${at.y}px, 0)`;
+    el.style.opacity = visible ? "1" : "0";
+  };
+
+  useEffect(() => {
+    overlayRef.current?.focus({ preventScroll: true });
+    setStatus("");
+    if (tool === "mallet") {
+      const p = petCenter();
+      placeMallet(p ?? aim.current);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tool]);
   useEffect(() => () => {
     window.clearTimeout(bonkTimer.current);
     window.clearTimeout(burstTimer.current);
@@ -52,7 +79,6 @@ export function PetGadgetLayer(props: Props) {
     const o = origin();
     const dx = to.x - o.x, dy = to.y - o.y, d = Math.hypot(dx, dy) || 1;
     if (cb.current.reduced) {
-      // Still feedback: a fixed dotted trajectory, hit test against the straight line.
       const r = cb.current.getPetRect();
       let hit = false;
       if (r) {
@@ -69,12 +95,14 @@ export function PetGadgetLayer(props: Props) {
   };
 
   const bonk = (at: GadgetPoint) => {
-    setMallet({ x: at.x, y: at.y, id: performance.now() });
+    placeMallet(at);
+    setSwing((n) => n + 1);
     const r = cb.current.getPetRect();
-    const hit = !!r && at.x >= r.left - 12 && at.x <= r.right + 12 && at.y >= r.top - 12 && at.y <= r.bottom + 12;
+    const hit = !!r && at.x >= r.left - 16 && at.x <= r.right + 16 && at.y >= r.top - 16 && at.y <= r.bottom + 16;
+    rings.current = [...rings.current, { x: at.x, y: at.y, born: performance.now() + (cb.current.reduced ? 0 : 90), hit }].slice(-MAX_RINGS);
     window.clearTimeout(bonkTimer.current);
-    if (hit) bonkTimer.current = window.setTimeout(() => cb.current.onBonk(), cb.current.reduced ? 0 : 130);
-    setStatus(hit ? `Pillow bop. ${name} flattens, then springs back.` : `Whiff. Click right on ${name}.`);
+    if (hit) bonkTimer.current = window.setTimeout(() => cb.current.onBonk(), cb.current.reduced ? 0 : 90);
+    setStatus(hit ? `Pillow bop. ${name} flattens, then springs back.` : `Whiff. Swing right on ${name}.`);
   };
 
   const strike = (at: GadgetPoint) => {
@@ -85,34 +113,22 @@ export function PetGadgetLayer(props: Props) {
     blasts.current = [...blasts.current, { x: at.x, y: at.y, born: performance.now() - (cb.current.reduced ? DROP_MS : 0), fired: false, parts }].slice(-MAX_BLASTS);
   };
 
-  const throwStick = (to: GadgetPoint) => {
-    const safe = { x: Math.max(24, Math.min(window.innerWidth - 24, to.x)), y: Math.max(90, Math.min(window.innerHeight - 70, to.y)) };
-    if (cb.current.reduced) {
-      cb.current.onStickThrown(safe);
-      setStatus(`${name} trots off to fetch the stick.`);
-      return;
-    }
-    sticks.current = [{ from: origin(), to: safe, born: performance.now() }];
-    setStatus("Stick away.");
-  };
-
-  const act = (at: GadgetPoint, dragFrom?: GadgetPoint | null) => {
+  const act = (at: GadgetPoint) => {
     if (tool === "foam") fire(at);
     else if (tool === "mallet") bonk(at);
     else if (tool === "airstrike") strike(at);
-    else {
-      const moved = dragFrom && Math.hypot(at.x - dragFrom.x, at.y - dragFrom.y) > 24;
-      throwStick(moved ? { x: at.x + (at.x - dragFrom!.x) * 0.8, y: at.y + (at.y - dragFrom!.y) * 0.8 } : at);
+    else if (isPower(tool)) {
+      powers.current = [...powers.current, spawnPower(tool, at, origin(), performance.now())].slice(-MAX_POWERS);
+      setStatus(tool === "beam" ? "Charging the beam." : tool === "vortex" ? "The well is pulling." : "Bolt incoming.");
     }
   };
   const actRef = useRef(act); actRef.current = act;
 
-  // Keyboard: Escape exits; arrows aim; Enter/Space fires. Only while a tool is active.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); cb.current.onCancel(); return; }
       const target = e.target as HTMLElement | null;
-      if (target?.closest(".gadget-toolbar") || target?.closest(".pet-drawer") || target?.tagName === "INPUT") return;
+      if (target?.closest(".gadget-toolbar") || target?.closest(".pet-drawer") || target?.closest(".pet-chase-alert") || target?.tagName === "INPUT") return;
       const step = e.shiftKey ? 64 : 24;
       const moves: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
       if (moves[e.key]) {
@@ -124,22 +140,27 @@ export function PetGadgetLayer(props: Props) {
       } else if (e.key === "Enter" || e.key === " ") {
         e.preventDefault(); e.stopPropagation();
         if (tool === "mallet") {
-          const r = cb.current.getPetRect();
-          if (r) actRef.current({ x: r.x + r.width / 2, y: r.y + r.height / 2 });
+          const p = petCenter();
+          if (p) actRef.current({ x: p.x, y: p.y });
         } else actRef.current(aim.current);
       }
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tool]);
 
-  // One canvas draws every projectile and effect; all collections are capped.
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
     let raf = 0;
     let prev = performance.now();
+    const hooks = {
+      pet: petCenter,
+      knock: (vx: number, vy: number, mode: "toss" | "pinball") => cb.current.onKnock(vx, vy, mode),
+      report: (kind: PowerTool, hit: boolean) => setStatus(POWER_TEXT[kind][hit ? 0 : 1].replace("{n}", cb.current.name)),
+    };
     const draw = (now: number) => {
       const s = Math.min(2, Math.max(0.5, (now - prev) / 16.67));
       prev = now;
@@ -153,18 +174,17 @@ export function PetGadgetLayer(props: Props) {
       const currentTool = cb.current.tool;
       const a = aim.current, o = origin();
 
-      // Aim guides
       if (currentTool !== "mallet") {
         ctx.save();
         ctx.strokeStyle = "rgba(239,112,88,.85)"; ctx.lineWidth = 2; ctx.setLineDash([6, 6]);
-        if (currentTool === "foam" || currentTool === "stick") {
+        if (currentTool === "foam" || currentTool === "beam") {
           ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.lineTo(a.x, a.y); ctx.stroke();
           ctx.setLineDash([]); ctx.fillStyle = "#1e4e48";
           ctx.beginPath(); ctx.roundRect(o.x - 20, o.y - 10, 40, 26, 9); ctx.fill();
-          ctx.fillStyle = "#c9f36a"; ctx.beginPath(); ctx.arc(o.x, o.y, 6, 0, Math.PI * 2); ctx.fill();
-        } else {
+          ctx.fillStyle = currentTool === "beam" ? "#7fc8c2" : "#c9f36a"; ctx.beginPath(); ctx.arc(o.x, o.y, 6, 0, Math.PI * 2); ctx.fill();
+        } else if (currentTool === "airstrike" || currentTool === "vortex") {
           ctx.strokeStyle = "rgba(30,78,72,.55)";
-          ctx.beginPath(); ctx.arc(a.x, a.y, BLAST_RANGE, 0, Math.PI * 2); ctx.stroke();
+          ctx.beginPath(); ctx.arc(a.x, a.y, currentTool === "vortex" ? VORTEX_RANGE : BLAST_RANGE, 0, Math.PI * 2); ctx.stroke();
         }
         ctx.setLineDash([]); ctx.strokeStyle = "#ef7058"; ctx.lineWidth = 2.5;
         ctx.beginPath(); ctx.arc(a.x, a.y, 11, 0, Math.PI * 2);
@@ -174,7 +194,6 @@ export function PetGadgetLayer(props: Props) {
         ctx.restore();
       }
 
-      // Foam balls
       balls.current = balls.current.filter((b) => {
         const age = Math.max(0, now - b.born);
         if (b.still) {
@@ -196,15 +215,12 @@ export function PetGadgetLayer(props: Props) {
           }
         }
         if (age > 2600 || b.y > h + 30 || b.x < -30 || b.x > w + 30) return false;
-        ctx.save(); ctx.globalAlpha = b.hit ? Math.max(0, 1 - (age % 2600) / 2600) : 1;
+        ctx.save(); ctx.globalAlpha = b.hit ? Math.max(0, 1 - age / 2600) : 1;
         drawBall(ctx, b.x, b.y); ctx.restore();
         return true;
       });
 
-      // Toy airstrikes
       blasts.current = blasts.current.filter((bl) => {
-        // An input event can arrive after this RAF timestamp was sampled.
-        // Clamp the age so a just-created effect never has negative radii.
         const age = Math.max(0, now - bl.born);
         if (age < DROP_MS) {
           const t = age / DROP_MS;
@@ -253,17 +269,27 @@ export function PetGadgetLayer(props: Props) {
         return true;
       });
 
-      // Thrown stick
-      sticks.current = sticks.current.filter((st) => {
-        const t = Math.max(0, Math.min(1, (now - st.born) / STICK_MS));
-        const x = st.from.x + (st.to.x - st.from.x) * t;
-        const y = st.from.y + (st.to.y - st.from.y) * t - Math.sin(Math.PI * t) * 130;
-        drawStick(ctx, x, y, t * Math.PI * 4);
-        if (t >= 1) {
-          cb.current.onStickThrown(st.to);
-          setStatus(`${cb.current.name} is off to fetch the stick.`);
-          return false;
+      powers.current = powers.current.filter((p) => stepPower(ctx, p, now, still, hooks));
+
+      // Pillow impacts: a capped set of soft rings, no DOM particles.
+      rings.current = rings.current.filter((r) => {
+        const age = Math.max(0, now - r.born);
+        const life = still ? 500 : 360;
+        if (age >= life) return false;
+        if (now < r.born) return true;
+        const t = age / life;
+        ctx.save();
+        ctx.globalAlpha = 1 - t;
+        ctx.strokeStyle = r.hit ? "#f3a6b8" : "rgba(84,113,107,.6)"; ctx.lineWidth = r.hit ? 4 : 2;
+        ctx.beginPath(); ctx.ellipse(r.x, r.y + 8, 14 + (still ? 10 : 30 * t), 6 + (still ? 4 : 12 * t), 0, 0, Math.PI * 2); ctx.stroke();
+        if (r.hit && !still) {
+          ctx.fillStyle = "#fbe2e8";
+          for (let i = 0; i < 5; i++) {
+            const ang = -Math.PI / 2 + (i - 2) * 0.55;
+            ctx.beginPath(); ctx.arc(r.x + Math.cos(ang) * (18 + 26 * t), r.y + Math.sin(ang) * (18 + 26 * t), 3, 0, Math.PI * 2); ctx.fill();
+          }
         }
+        ctx.restore();
         return true;
       });
 
@@ -271,6 +297,7 @@ export function PetGadgetLayer(props: Props) {
     };
     raf = window.requestAnimationFrame(draw);
     return () => window.cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const point = (e: React.PointerEvent): GadgetPoint => ({ x: e.clientX, y: e.clientY });
@@ -284,9 +311,21 @@ export function PetGadgetLayer(props: Props) {
       tabIndex={-1}
       role="application"
       aria-label={`${info.label} play mode. ${info.help} Press Escape to exit.`}
-      onPointerDown={(e) => { e.stopPropagation(); if (e.button !== 0) return; down.current = point(e); aim.current = point(e); e.currentTarget.setPointerCapture?.(e.pointerId); }}
-      onPointerMove={(e) => { e.stopPropagation(); aim.current = point(e); }}
-      onPointerUp={(e) => { e.stopPropagation(); if (!down.current) return; const from = down.current; down.current = null; act(point(e), from); }}
+      onPointerDown={(e) => {
+        e.stopPropagation();
+        if (e.button !== 0) return;
+        aim.current = point(e);
+        if (tool === "mallet") { bonk(point(e)); return; }
+        down.current = point(e);
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+      }}
+      onPointerMove={(e) => {
+        e.stopPropagation();
+        aim.current = point(e);
+        if (tool === "mallet") placeMallet(point(e), !(e.target as HTMLElement).closest(".gadget-toolbar"));
+      }}
+      onPointerLeave={() => { if (tool === "mallet") placeMallet(aim.current, false); }}
+      onPointerUp={(e) => { e.stopPropagation(); if (!down.current) return; down.current = null; act(point(e)); }}
       onPointerCancel={() => { down.current = null; }}
       onWheel={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
@@ -306,14 +345,17 @@ export function PetGadgetLayer(props: Props) {
             fill="#fff3d3" stroke="#e5b65a" strokeWidth="3" />
         </svg>
       )}
-      {mallet && (
-        <span key={mallet.id} className={`gadget-mallet${reduced ? " is-still" : ""}`} style={{ left: mallet.x, top: mallet.y }} aria-hidden="true" data-testid="effect-pet-mallet"
-          onAnimationEnd={() => setMallet(null)}>
-          <svg viewBox="0 0 70 70" width="70" height="70">
-            <path d="M33 64 46 30" stroke="#8a6a43" strokeWidth="6" strokeLinecap="round" />
-            <rect x="22" y="4" width="46" height="30" rx="13" transform="rotate(20 45 19)" fill="#f3a6b8" stroke="#b9677c" strokeWidth="3" />
-            <path d="M31 14q12 8 30 10" stroke="#fbe2e8" strokeWidth="3" strokeLinecap="round" fill="none" />
-          </svg>
+      {tool === "mallet" && (
+        <span ref={malletRef} className="gadget-mallet-cursor" aria-hidden="true" data-testid="cursor-pet-mallet">
+          <span key={swing} className={`gadget-mallet-swing${swing && !reduced ? " is-swing" : ""}${swing && reduced ? " is-still" : ""}`} data-testid="effect-pet-mallet">
+            <svg viewBox="0 0 70 70" width="70" height="70">
+              <path d="M33 64 46 30" stroke="#8a6a43" strokeWidth="6" strokeLinecap="round" />
+              <g className="gadget-pillow">
+                <rect x="22" y="4" width="46" height="30" rx="13" transform="rotate(20 45 19)" fill="#f3a6b8" stroke="#b9677c" strokeWidth="3" />
+                <path d="M31 14q12 8 30 10" stroke="#fbe2e8" strokeWidth="3" strokeLinecap="round" fill="none" />
+              </g>
+            </svg>
+          </span>
         </span>
       )}
       <div className="gadget-toolbar" data-testid="toolbar-pet-gadget"
@@ -328,7 +370,6 @@ export function PetGadgetLayer(props: Props) {
           <X size={14} /> Done
         </button>
       </div>
-      {reduced && mallet && <span className="gadget-still-note" style={{ left: mallet.x, top: mallet.y }} aria-hidden="true" />}
     </div>
   );
 }
@@ -345,10 +386,4 @@ function drawStar(ctx: CanvasRenderingContext2D, x: number, y: number, outer: nu
     ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
   }
   ctx.closePath(); ctx.fill();
-}
-export function drawStick(ctx: CanvasRenderingContext2D, x: number, y: number, rot: number) {
-  ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
-  ctx.strokeStyle = "#8a6a43"; ctx.lineCap = "round"; ctx.lineWidth = 6;
-  ctx.beginPath(); ctx.moveTo(-18, 0); ctx.lineTo(18, 0); ctx.moveTo(4, 0); ctx.lineTo(11, -7); ctx.stroke();
-  ctx.restore();
 }

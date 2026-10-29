@@ -24,17 +24,13 @@
 .gadget-cancel { flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px; border: 1px solid #1e4e48; border-radius: 8px; background: #1e4e48; color: #f5f8f3; font: 700 11px var(--app-font-sans); cursor: pointer; }
 .gadget-cancel:hover { background: #173d3a; }
 .gadget-cancel:focus-visible { outline: 2px solid #ef7058; outline-offset: 2px; }
-.gadget-mallet { position: absolute; width: 70px; height: 70px; margin: -62px 0 0 -14px; pointer-events: none; transform-origin: 20% 92%; animation: gadget-bop .42s cubic-bezier(.4,0,.3,1) forwards; }
-.gadget-mallet.is-still { animation: gadget-still .7s step-end forwards; transform: rotate(-12deg); }
 @keyframes gadget-bop { 0% { transform: rotate(-55deg); opacity: 1; } 32% { transform: rotate(14deg) scaleY(.9); } 55% { transform: rotate(4deg); } 100% { transform: rotate(-30deg); opacity: 0; } }
 @keyframes gadget-still { 0% { opacity: 1; } 100% { opacity: 0; } }
-.gadget-still-note { position: absolute; width: 50px; height: 50px; margin: -25px 0 0 -25px; border: 3px dashed #ef7058; border-radius: 50%; pointer-events: none; }
 .roam-layer .roam-body { transform-origin: 50% 100%; transition: transform .42s cubic-bezier(.3,1.9,.5,1); }
 .roam-layer .roam-pet.is-squashed .roam-body { transition: transform .07s ease-in; }
 .roam-layer .roam-pet.is-squashed .roam-svg { animation: none; }
 .roam-layer .roam-pet.is-fetching { transition: none; }
 .roam-layer .roam-pet.is-fetching .roam-svg { animation: roam-trot .28s ease-in-out infinite; }
-.pet-stick { position: absolute; left: 0; top: 0; width: 40px; height: 16px; pointer-events: none; z-index: 1; }
 .pet-gadget-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
 .pet-gadget-grid .pet-small-btn { justify-content: flex-start; }
 .pet-small-btn[aria-pressed="true"] { border-color: #1e4e48; background: #1e4e48; color: #f5f8f3; }
@@ -50,5 +46,51 @@
 @media (prefers-reduced-motion: reduce) {
   .roam-layer .roam-body, .roam-layer .roam-pet.is-squashed .roam-body { transition: none !important; }
   .roam-layer .roam-pet.is-fetching .roam-svg { animation: none !important; }
-  .gadget-mallet:not(.is-still) { animation: gadget-still .7s step-end forwards !important; }
+}
+/* Pillow mallet follows the pointer; native cursor hidden only on the active play surface. */
+.gadget-overlay.tool-mallet { cursor: none; }
+.gadget-overlay.tool-mallet .gadget-toolbar { cursor: default; }
+.gadget-mallet-cursor { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; z-index: 3; transition: opacity .12s; }
+.gadget-mallet-swing { position: absolute; left: -14px; top: -62px; width: 70px; height: 70px; transform-origin: 20% 92%; transform: rotate(-28deg); }
+.gadget-mallet-swing.is-swing { animation: mallet-swing .26s cubic-bezier(.3,0,.25,1); }
+.gadget-mallet-swing.is-still { transform: rotate(4deg); }
+.gadget-pillow { transform-box: fill-box; transform-origin: 50% 100%; }
+.gadget-mallet-swing.is-swing .gadget-pillow { animation: pillow-squash .26s ease-out; }
+@keyframes mallet-swing { 0% { transform: rotate(-58deg); } 38% { transform: rotate(14deg); } 62% { transform: rotate(-6deg); } 100% { transform: rotate(-28deg); } }
+@keyframes pillow-squash { 0%, 30% { transform: scale(1, 1); } 42% { transform: scale(1.22, .7); } 70% { transform: scale(.94, 1.08); } 100% { transform: scale(1, 1); } }
+/* Persistent fetch stick */
+.pet-stick { position: absolute; left: 0; top: 0; width: 44px; height: 22px; padding: 0; border: 0; background: transparent; pointer-events: auto; cursor: grab; touch-action: none; user-select: none; z-index: 1; border-radius: 8px; -webkit-tap-highlight-color: transparent; }
+.pet-stick svg { display: block; width: 44px; height: 22px; filter: drop-shadow(0 3px 2px rgba(40,54,53,.22)); }
+.pet-stick:active { cursor: grabbing; }
+.pet-stick.is-carried { pointer-events: none; z-index: 3; }
+.pet-stick:focus-visible { outline: 2px solid #ef7058; outline-offset: 3px; }
+/* Chase banner with the random power control */
+.roam-layer .pet-chase-alert { z-index: 6; pointer-events: auto; top: auto; bottom: max(104px, env(safe-area-inset-bottom)); padding: 6px 6px 6px 15px; animation-duration: 1.6s; }
+.pet-chase-alert .pet-chase-text { font-size: 12px !important; color: inherit !important; }
+.pet-chase-power { display: inline-flex; align-items: center; gap: 5px; padding: 7px 12px; border: 0; border-radius: 999px; background: #fff1d2; color: #8a2f1c; font: 800 12px var(--app-font-sans); cursor: pointer; }
+.pet-chase-power:hover { background: #ffe39c; }
+.pet-chase-stop { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid rgba(255,241,210,.6); border-radius: 50%; background: transparent; color: #fff1d2; cursor: pointer; }
+.pet-chase-power:focus-visible, .pet-chase-stop:focus-visible { outline: 2px solid #173536; outline-offset: 2px; }
+/* Compact play kit */
+.pet-playkit { margin-top: 8px; border: 1px solid #c6d8ce; border-radius: 11px; padding: 0 10px; }
+.pet-playkit[open] { padding-bottom: 9px; }
+.pet-playkit summary { display: flex; align-items: center; gap: 8px; padding: 9px 0; cursor: pointer; list-style: none; font-size: 12px; font-weight: 800; color: #1e4e48; }
+.pet-playkit summary::-webkit-details-marker { display: none; }
+.pet-playkit summary small { margin-left: auto; font-weight: 600; color: #6a827b; font-size: 10px; }
+.pet-playkit summary svg { transition: transform .2s; }
+.pet-playkit[open] summary svg { transform: rotate(180deg); }
+.pet-kit-row { display: flex; flex-wrap: wrap; gap: 5px; margin: 4px 0 8px; }
+.pet-chip { display: inline-flex; align-items: center; gap: 4px; padding: 5px 9px; border: 1px solid #c9d3c8; border-radius: 999px; background: transparent; color: #315b54; font: 700 11px var(--app-font-sans); cursor: pointer; }
+.pet-chip:hover { background: #e7f0e7; }
+.pet-chip.is-power { border-color: #e7b3a3; color: #9b3f2b; }
+.pet-chip[aria-pressed="true"] { border-color: #1e4e48; background: #1e4e48; color: #f5f8f3; }
+.pet-chip.is-power[aria-pressed="true"] { border-color: #b2523d; background: #b2523d; }
+.dark .pet-playkit { border-color: #355756; }
+.dark .pet-playkit summary { color: #c9f36a; }
+.dark .pet-chip { border-color: #456361; color: #d0dfd6; }
+.dark .pet-chip.is-power { border-color: #7a4a3c; color: #f5a48f; }
+.dark .pet-chip[aria-pressed="true"] { background: #c9f36a; border-color: #c9f36a; color: #173536; }
+@media (prefers-reduced-motion: reduce) {
+  .gadget-mallet-swing.is-swing, .gadget-mallet-swing.is-swing .gadget-pillow { animation: none !important; }
+  .gadget-mallet-cursor, .pet-playkit summary svg { transition: none !important; }
 }

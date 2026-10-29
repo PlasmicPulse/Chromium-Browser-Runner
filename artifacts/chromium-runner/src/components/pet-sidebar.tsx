@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Bath, BedDouble, Carrot, Hand, Moon, Orbit, Pencil, RotateCw, Sparkles, Timer, X } from "lucide-react";
+import { Bath, BedDouble, Carrot, ChevronDown, Hand, Moon, Orbit, Pencil, RotateCw, Sparkles, Timer, X } from "lucide-react";
 import { RoamingPet } from "./roaming-pet";
 import { PET_APPEARANCES, PetSprite } from "./pet-appearance";
-import { GADGETS, type GadgetTool } from "./pet-gadgets";
+import { GADGETS, POWER_IDS, type GadgetTool } from "./pet-gadgets";
 import "./pet-sidebar.css";
 import {
   PET_FURNITURE,
@@ -271,6 +271,13 @@ export function PetSidebar() {
     setNotice(`${GADGETS.find((g) => g.id === tool)?.label} ready. Press Escape or Done to stop.`);
     setOpen(false);
   };
+  const equipRandomPower = () => {
+    const options = POWER_IDS.filter((id) => id !== gadget);
+    const tool = options[Math.floor(Math.random() * options.length)];
+    setGadget(tool);
+    setOpen(false);
+    setNotice(`${GADGETS.find((g) => g.id === tool)?.label} equipped. Hit ${pet.name} to end the chase.`);
+  };
   const playToss = (kind: "pinball" | "spin") => {
     setPlayAction({ kind, id: ++tossId.current });
   };
@@ -395,6 +402,7 @@ export function PetSidebar() {
         playAction={playAction}
         gadget={gadget}
         onGadgetCancel={() => setGadget(null)}
+        onRandomPower={equipRandomPower}
       />
       <Dialog.Portal>
         <Dialog.Content
@@ -442,29 +450,33 @@ export function PetSidebar() {
               </button>
               {game.best > 0 && <span className="pet-best" data-testid="text-pet-best">Best {game.best}</span>}
             </div>
-            <div className="pet-throw-row" role="group" aria-label="Playful tosses">
-              <button type="button" className="pet-small-btn" onClick={() => playToss("pinball")} data-testid="button-pet-pinball">
-                <Orbit size={12} /> Pinball launch
-              </button>
-              <button type="button" className="pet-small-btn" onClick={() => playToss("spin")} data-testid="button-pet-spin-toss">
-                <RotateCw size={12} /> Spinning toss
-              </button>
-            </div>
-            <div className="pet-gadget-grid" role="group" aria-label="Toy gadgets" data-testid="group-pet-gadgets">
-              {GADGETS.map((g) => (
-                <button key={g.id} type="button" className="pet-small-btn" aria-pressed={gadget === g.id} title={g.short}
-                  onClick={() => chooseGadget(g.id)} data-testid={`button-pet-gadget-${g.id}`}>
-                  <g.icon size={12} /> {g.label}
-                </button>
-              ))}
-            </div>
+            <details className="pet-playkit" data-testid="panel-pet-playkit">
+              <summary data-testid="button-pet-playkit-toggle"><span>Play kit</span><small>{gadget ? `${GADGETS.find((g) => g.id === gadget)?.label} on` : "Toys and powers"}</small><ChevronDown size={13} aria-hidden="true" /></summary>
+              <span className="pet-customizer-label">Toys</span>
+              <div className="pet-kit-row" role="group" aria-label="Toys">
+                <button type="button" className="pet-chip" onClick={() => playToss("pinball")} data-testid="button-pet-pinball"><Orbit size={12} /> Pinball</button>
+                <button type="button" className="pet-chip" onClick={() => playToss("spin")} data-testid="button-pet-spin-toss"><RotateCw size={12} /> Spin toss</button>
+                {GADGETS.filter((g) => g.group === "toy").map((g) => (
+                  <button key={g.id} type="button" className="pet-chip" aria-pressed={gadget === g.id} title={g.short}
+                    onClick={() => chooseGadget(g.id)} data-testid={`button-pet-gadget-${g.id}`}><g.icon size={12} /> {g.label}</button>
+                ))}
+              </div>
+              <span className="pet-customizer-label">Powers</span>
+              <div className="pet-kit-row" role="group" aria-label="Powers" data-testid="group-pet-gadgets">
+                {GADGETS.filter((g) => g.group === "power").map((g) => (
+                  <button key={g.id} type="button" className="pet-chip is-power" aria-pressed={gadget === g.id} title={g.short}
+                    onClick={() => chooseGadget(g.id)} data-testid={`button-pet-gadget-${g.id}`}><g.icon size={12} /> {g.label}</button>
+                ))}
+              </div>
+              <p className="pet-hint">The fetch stick lives on the page: flick it and {pet.name} brings it back to your pointer.</p>
+            </details>
             {gadget && (
               <div className="pet-gadget-active" data-testid="status-pet-gadget-active">
                 <span>{GADGETS.find((g) => g.id === gadget)?.help} Escape also exits.</span>
                 <button type="button" className="pet-small-btn" onClick={() => setGadget(null)} data-testid="button-pet-gadget-stop"><X size={12} /> Stop</button>
               </div>
             )}
-            <p className="pet-hint">Pick a toy gadget, then play right on the page. The page only catches clicks while a toy is active.</p>
+            <p className="pet-hint">Pick a toy or power, then play right on the page. The page only catches clicks while one is active.</p>
             <p className="pet-hint">Just for fun. Tosses and toys never change Pip’s care stats.</p>
             <p className="pet-hint">Tap {pet.name} in the hollow to pet. In Acorn chase, tap or press Enter on each acorn within 15 seconds; every catch lifts happiness and energy.</p>
             <div className="pet-looks" role="group" aria-label="Choose your pet's look" data-testid="group-pet-appearances">
@@ -558,7 +570,7 @@ export function PetSidebar() {
               <button type="button" className="pet-action pet-action-bed" aria-pressed={pet.tuckedAway} onClick={toggleBed} data-testid="button-pet-tuck"><BedDouble size={15} /> {pet.tuckedAway ? "Let wander" : "Tuck into bed"}</button>
               <button type="button" className="pet-action pet-action-bed" role="switch" aria-checked={pet.chaseEnabled} aria-label="Surprise cursor chase" onClick={() => update((p) => ({ ...p, chaseEnabled: !p.chaseEnabled }))} data-testid="button-pet-chase-toggle"><Timer size={15} /> Cursor chase: {pet.chaseEnabled ? "On" : "Off"}</button>
             </div>
-            <p className="pet-hint">When enabled, {pet.name} may chase your cursor about every five minutes while awake and wandering. Turn it off for quieter browsing.</p>
+            <p className="pet-hint">When enabled, {pet.name} may chase your cursor about every five minutes while awake and wandering. Use Random power on the chase banner and land a hit to fend them off, or press Escape. Turn it off for quieter browsing.</p>
             <p className="pet-note" data-testid="text-pet-storage">
               {stored
                 ? <><strong>Pet saved on this browser only.</strong> {pet.name} lives in local storage, not on the server. Stats drift slowly while you're away, but never hit zero. Required site activity logging still applies.</>

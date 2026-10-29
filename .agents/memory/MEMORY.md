@@ -10,3 +10,4 @@
 - [Consent-gated verification](consent-gated-verification.md) — A preview capture of the consent screen does not verify interactions behind it.
 - [Pip play constraints](pip-play.md) — Rough play is figurative, never destructive or a happiness penalty; avoid comic sound-effect text and protect browser responsiveness.
 - [Background photo storage](background-photo-storage.md) — Background photos must stay in the visitor's current browser, without cloud uploads or cross-device sync.
+- [Local music storage](local-music-storage.md) — Uploaded music is MP3-only and stays in the visitor's browser; don't add streaming links or remote storage.

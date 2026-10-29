@@ -102,11 +102,11 @@
   padding: 10px 15px; border: 2px solid #fff1d2; border-radius: 999px;
   color: #fffaf1; background: #b74637; box-shadow: 0 6px 24px rgba(113,36,28,.38);
   font: 850 12px/1.2 var(--app-font-sans); letter-spacing: .045em; white-space: nowrap;
-  transform: translateX(-50%); animation: chase-alert .75s ease-in-out infinite alternate;
+  transform: translateX(-50%);
 }
 .pet-chase-alert span:first-child { font-size: 17px; }
 .pet-chase-alert span:last-child { color: #ffe39c; font-size: 10px; }
-@keyframes chase-alert { to { box-shadow: 0 8px 30px rgba(214,91,50,.58); transform: translateX(-50%) scale(1.035); } }
+.pet-chase-shortcut { padding: 3px 6px; border-radius: 999px; color: #fff4cf !important; background: rgba(255,255,255,.16); font-size: 10px !important; letter-spacing: 0; }
 .pet-impact {
   position: fixed; z-index: 45; width: 0; height: 0; pointer-events: none;
 }

@@ -1,9 +1,10 @@
 import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
-import { BedDouble } from "lucide-react";
+import { BedDouble, Shuffle, X } from "lucide-react";
 import { PET_APPEARANCES, PetSprite, type PetAppearance } from "./pet-appearance";
 import { PetImpact, type WallImpact } from "./pet-impact";
 import { PetGadgetLayer } from "./pet-gadget-layer";
-import type { GadgetPoint, GadgetTool } from "./pet-gadgets";
+import type { GadgetTool } from "./pet-gadgets";
+import { FetchStick, clampStick, type StickPos } from "./pet-fetch-stick";
 
 const SIZE = 44;
 const BED_SIZE = { width: 88, height: 64 };
@@ -70,11 +71,13 @@ type Props = {
   playAction: { kind: "pinball" | "spin"; id: number } | null;
   gadget: GadgetTool | null;
   onGadgetCancel: () => void;
+  onRandomPower: () => void;
 };
-type Fetch = { x: number; y: number; phase: "chase" | "return"; home: Position };
+type Fetch = { phase: "chase" | "return"; started: number };
+const CHASE_MS = 15000, CHASE_BONUS_MS = 4000, CHASE_CAP_MS = 20000, FETCH_MAX_MS = 14000;
 
 export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingPet(
-  { name, moodKey, appearance, tucked, chaseEnabled, open, onOpen, onToggleTucked, onDropInBed, onLiftFromBed, playAction, gadget, onGadgetCancel }, ref,
+  { name, moodKey, appearance, tucked, chaseEnabled, open, onOpen, onToggleTucked, onDropInBed, onLiftFromBed, playAction, gadget, onGadgetCancel, onRandomPower }, ref,
 ) {
   const [bedPos, setBedPos] = useState<Position>(readBed);
   const bedPosRef = useRef(bedPos);
@@ -86,6 +89,7 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
   const [dragging, setDragging] = useState(false);
   const [bedDragging, setBedDragging] = useState(false);
   const [chasing, setChasing] = useState(false);
+  const chasingRef = useRef(chasing); chasingRef.current = chasing;
   const [thrown, setThrown] = useState(false);
   const [spinToss, setSpinToss] = useState(false);
   const [impact, setImpact] = useState<WallImpact | null>(null);
@@ -110,6 +114,10 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
   const [fetch, setFetch] = useState<Fetch | null>(null);
   const fetchRef = useRef(fetch); fetchRef.current = fetch;
   const fetching = fetch !== null;
+  const [stick, setStickState] = useState<StickPos>(() => typeof window === "undefined" ? { x: 120, y: 300 } : clampStick(window.innerWidth * 0.32, window.innerHeight - 130));
+  const stickRef = useRef(stick); stickRef.current = stick;
+  const setStick = useCallback((p: StickPos) => { stickRef.current = p; setStickState(p); }, []);
+  const chaseClock = useRef({ start: 0, deadline: 0, extended: false });
 
   useEffect(() => {
     const track = (event: PointerEvent) => {
@@ -117,11 +125,11 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
       cursor.current = { x: event.clientX, y: event.clientY };
     };
     const leave = () => { cursor.current = null; };
-    window.addEventListener("pointermove", track, { passive: true });
+    window.addEventListener("pointermove", track, { passive: true, capture: true });
     document.addEventListener("pointerleave", leave);
     window.addEventListener("blur", leave);
     return () => {
-      window.removeEventListener("pointermove", track);
+      window.removeEventListener("pointermove", track, { capture: true });
       document.removeEventListener("pointerleave", leave);
       window.removeEventListener("blur", leave);
     };
@@ -147,11 +155,12 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
       const nextBed = clampBed(bedPosRef.current.x, bedPosRef.current.y);
       setBed(nextBed);
       setPos((current) => tucked ? bedDock(nextBed) : clampPos(current.x, current.y));
+      setStick(clampStick(stickRef.current.x, stickRef.current.y));
     };
     window.addEventListener("resize", fn);
     window.visualViewport?.addEventListener("resize", fn);
     return () => { window.removeEventListener("resize", fn); window.visualViewport?.removeEventListener("resize", fn); };
-  }, [setBed, tucked]);
+  }, [setBed, setStick, tucked]);
 
   useEffect(() => { if (tucked) setPos(bedDock(bedPos)); }, [bedPos, tucked]);
 
@@ -172,23 +181,60 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
     return () => { window.clearInterval(id); window.clearTimeout(stopT); };
   }, [paused]);
 
-  // A short, clearly announced chase happens occasionally while Pip is out exploring.
+  // Spontaneous chase: roughly every five minutes, only while free to roam.
+  const startChase = useCallback(() => {
+    const now = Date.now();
+    chaseClock.current = { start: now, deadline: now + CHASE_MS, extended: false };
+    setChasing(true);
+  }, []);
+  const blocked = !chaseEnabled || fetching || open || reduced || tucked || moodKey === "sleepy" || dragging || thrown;
   useEffect(() => {
-    if (gadget || !chaseEnabled || fetching || open || reduced || tucked || moodKey === "sleepy" || dragging || thrown) {
-      setChasing(false);
-      return;
-    }
-    let timer: number;
-    if (chasing) {
-      timer = window.setTimeout(() => setChasing(false), 7200);
-    } else {
-      timer = window.setTimeout(() => {
-        nextChaseAt.current = Date.now() + 270000 + Math.random() * 60000;
-        setChasing(true);
-      }, Math.max(1000, nextChaseAt.current - Date.now()));
-    }
+    if (chasing || gadget || blocked) return;
+    const timer = window.setTimeout(() => {
+      nextChaseAt.current = Date.now() + 270000 + Math.random() * 60000;
+      startChase();
+    }, Math.max(1000, nextChaseAt.current - Date.now()));
     return () => window.clearTimeout(timer);
-  }, [gadget, chaseEnabled, chasing, dragging, fetching, moodKey, open, reduced, thrown, tucked]);
+  }, [blocked, chasing, gadget, startChase]);
+  // Equipping a toy or power never cancels the chase; only blockers, hits, Escape or the deadline do.
+  useEffect(() => { if (chasing && blocked) setChasing(false); }, [blocked, chasing]);
+  const randomPower = useCallback(() => {
+    const c = chaseClock.current;
+    if (!c.extended) {
+      c.extended = true;
+      c.deadline = Math.min(c.start + CHASE_CAP_MS, c.deadline + CHASE_BONUS_MS);
+    }
+    onRandomPower();
+  }, [onRandomPower]);
+  useEffect(() => {
+    if (!chasing) return;
+    const id = window.setInterval(() => { if (Date.now() >= chaseClock.current.deadline) setChasing(false); }, 250);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { setChasing(false); return; }
+      // Right Alt (AltGraph on some layouts) is reserved for Pip only during a chase.
+      // Capture and suppress both phases so it cannot type into or trigger the remote page.
+      if (e.code === "AltRight" || e.key === "AltGraph") {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        if (!e.repeat) randomPower();
+      }
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === "AltRight" || e.key === "AltGraph") {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("keyup", onKeyUp, true);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("keyup", onKeyUp, true);
+    };
+  }, [chasing, randomPower]);
 
   useEffect(() => {
     if (!chasing) return;
@@ -227,36 +273,44 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
   // A cancelled or switched tool never leaves Pip flattened.
   useEffect(() => { window.clearTimeout(squashTimer.current); setSquashed(false); }, [gadget]);
 
-  // Fetch: run to the stick at a steady capped speed, pick it up, bring it back.
+  // Fetch: run to the stick, carry it to wherever the cursor is now, drop it within reach.
   useEffect(() => {
     if (!fetching) return;
     let raf: number;
     let previous = performance.now();
+    const mouth = () => ({ x: posRef.current.x + SIZE / 2, y: posRef.current.y + SIZE - 8 });
     const step = (now: number) => {
       const elapsed = Math.min(40, now - previous) / 1000;
       previous = now;
       const f = fetchRef.current;
       if (f && throwRaf.current === null && !drag.current) {
-        const target = f.phase === "chase" ? { x: f.x - SIZE / 2, y: f.y - SIZE / 2 } : f.home;
-        const current = posRef.current;
-        const dx = target.x - current.x, dy = target.y - current.y;
-        const distance = Math.hypot(dx, dy);
-        if (distance < 4) {
-          if (f.phase === "chase") setFetch({ ...f, phase: "return" });
-          else setFetch(null);
+        if (now - f.started > FETCH_MAX_MS) {
+          if (f.phase === "return") setStick(clampStick(mouth().x, mouth().y));
+          setFetch(null);
         } else {
-          const move = Math.min((f.phase === "chase" ? 175 : 125) * elapsed, distance);
-          const next = clampDragPos(current.x + dx / distance * move, current.y + dy / distance * move);
-          if (Math.abs(dx) > 1) setFace(dx >= 0 ? 1 : -1);
-          posRef.current = next;
-          setPos(next);
+          const goal = f.phase === "chase" ? stickRef.current : (cursor.current ?? mouth());
+          const target = { x: goal.x - SIZE / 2, y: goal.y - SIZE / 2 };
+          const current = posRef.current;
+          const dx = target.x - current.x, dy = target.y - current.y;
+          const distance = Math.hypot(dx, dy);
+          const reach = f.phase === "chase" ? 6 : 52;
+          if (distance < reach) {
+            if (f.phase === "chase") setFetch({ ...f, phase: "return" });
+            else { setStick(clampStick(mouth().x, mouth().y)); setFetch(null); }
+          } else {
+            const move = Math.min((f.phase === "chase" ? 185 : 140) * elapsed, distance - (f.phase === "chase" ? 0 : reach - 4));
+            const next = clampDragPos(current.x + dx / distance * move, current.y + dy / distance * move);
+            if (Math.abs(dx) > 1) setFace(dx >= 0 ? 1 : -1);
+            posRef.current = next;
+            setPos(next);
+          }
         }
       }
       raf = window.requestAnimationFrame(step);
     };
     raf = window.requestAnimationFrame(step);
     return () => window.cancelAnimationFrame(raf);
-  }, [fetching]);
+  }, [fetching, setStick]);
 
   const launch = useCallback((x: number, y: number, vx: number, vy: number, mode: "toss" | "pinball" | "spin" = "toss") => {
     if (throwRaf.current !== null) window.cancelAnimationFrame(throwRaf.current);
@@ -352,17 +406,21 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
   const onBonk = useCallback(() => {
     window.clearTimeout(squashTimer.current);
     setSquashed(true);
-    squashTimer.current = window.setTimeout(() => setSquashed(false), 560);
-  }, []);
-  const onStickThrown = useCallback((to: GadgetPoint) => {
-    const r = petEl.current?.getBoundingClientRect();
-    if (tucked) onLiftFromBed();
+    squashTimer.current = window.setTimeout(() => setSquashed(false), 380);
+    // A bop during a chase counts as a hit: Pip recoils away from the cursor and gives up.
+    if (chasingRef.current) {
+      const c = cursor.current, p = posRef.current;
+      const dx = c ? p.x + SIZE / 2 - c.x : 1;
+      knock(Math.sign(dx || 1) * 9, -8, "toss");
+    }
+  }, [knock]);
+  const onKnock = useCallback((vx: number, vy: number, mode: "toss" | "pinball") => knock(vx, vy, mode), [knock]);
+  const onStickLanded = useCallback(() => {
+    if (tucked || drag.current) return;
     setChasing(false); setWalking(false);
-    const home = r ? clampPos(r.x, r.y) : posRef.current;
-    posRef.current = r ? clampDragPos(r.x, r.y) : posRef.current;
-    setPos(posRef.current);
-    setFetch({ x: to.x, y: to.y, phase: "chase", home });
-  }, [onLiftFromBed, tucked]);
+    setFetch({ phase: "chase", started: performance.now() });
+  }, [tucked]);
+  const onStickGrab = useCallback((p: StickPos) => { setStick(p); setFetch(null); }, [setStick]);
 
   const onPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
     e.stopPropagation();
@@ -449,14 +507,30 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
   const lookLabel = PET_APPEARANCES.find((choice) => choice.id === appearance)?.label ?? "pet";
   return (
     <div className="roam-layer" data-testid="layer-pet-roam">
-      <span id="roam-pet-help" className="pet-live">Press Enter or Space, or tap, to open {name}'s care panel. Drag to move {name}; flick quickly to toss them and make them bounce safely off the screen edge. Sometimes {name} gets bored and chases your cursor. Click the bed or drag {name} into it to stop wandering.</span>
-      {chasing && <div className="pet-chase-alert" role="status"><span aria-hidden="true">😤</span> PIP IS CHASING YOUR CURSOR! <span aria-hidden="true">Catch me!</span></div>}
+      <span id="roam-pet-help" className="pet-live">Press Enter or Space, or tap, to open {name}'s care panel. Drag to move {name}; flick quickly to toss them. Flick the stick to play fetch. Sometimes {name} chases your cursor; equip a power and hit them to fend them off, or press Escape. Click the bed or drag {name} into it to stop wandering.</span>
+      {chasing && (
+        <div className="pet-chase-alert" role="status" data-testid="status-pet-chase"
+          onPointerDown={stop} onMouseDown={stop} onTouchStart={stop} onKeyDown={stop} onKeyUp={stop} onClick={stop}>
+          <span className="pet-chase-text">{name} is chasing your cursor</span>
+          <button type="button" className="pet-chase-power" onClick={randomPower} data-testid="button-pet-random-power">
+            <Shuffle size={13} /> Random power <span className="pet-chase-shortcut">Right Alt</span>
+          </button>
+          <button type="button" className="pet-chase-stop" onClick={() => setChasing(false)} aria-label="Stop the chase" data-testid="button-pet-chase-stop">
+            <X size={13} />
+          </button>
+        </div>
+      )}
       {impact && <PetImpact key={impact.id} impact={impact} />}
-      {fetch && (
-        <svg className="pet-stick" viewBox="0 0 40 16" aria-hidden="true" data-testid="toy-pet-stick"
-          style={{ transform: fetch.phase === "chase" ? `translate3d(${fetch.x - 20}px, ${fetch.y - 8}px, 0)` : `translate3d(${pos.x + (face > 0 ? 18 : -14)}px, ${pos.y + 24}px, 0)` }}>
-          <path d="M3 8h34M24 8l7-6" stroke="#8a6a43" strokeWidth="5" strokeLinecap="round" fill="none" />
-        </svg>
+      {!tucked && (
+        <FetchStick
+          name={name}
+          pos={fetch?.phase === "return" ? { x: pos.x + SIZE / 2 + face * 12, y: pos.y + SIZE - 8 } : stick}
+          carried={fetch?.phase === "return"}
+          reduced={reduced}
+          onMove={setStick}
+          onGrab={onStickGrab}
+          onLanded={onStickLanded}
+        />
       )}
       <button
         ref={bedRef}
@@ -527,7 +601,7 @@ export const RoamingPet = forwardRef<HTMLButtonElement, Props>(function RoamingP
           onBallHit={onBallHit}
           onBonk={onBonk}
           onBlast={onBlast}
-          onStickThrown={onStickThrown}
+          onKnock={onKnock}
           onCancel={onGadgetCancel}
         />
       )}
