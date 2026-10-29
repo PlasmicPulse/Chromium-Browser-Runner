@@ -11,7 +11,6 @@ export type PowerHooks = {
   report: (kind: PowerTool, hit: boolean) => void;
 };
 
-export const MAX_POWERS = 3;
 export const VORTEX_RANGE = 210;
 const LIGHTNING_RANGE = 110;
 const TIMING: Record<PowerTool, { charge: number; after: number }> = {

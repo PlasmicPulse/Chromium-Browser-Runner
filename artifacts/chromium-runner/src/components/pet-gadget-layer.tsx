@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { GADGETS, isPower, type GadgetPoint, type GadgetTool, type PowerTool } from "./pet-gadgets";
-import { MAX_POWERS, spawnPower, stepPower, VORTEX_RANGE, type Power } from "./pet-powers";
+import { spawnPower, stepPower, VORTEX_RANGE, type Power } from "./pet-powers";
 import "./pet-gadgets.css";
 
 type Props = {
@@ -118,7 +118,7 @@ export function PetGadgetLayer(props: Props) {
     else if (tool === "mallet") bonk(at);
     else if (tool === "airstrike") strike(at);
     else if (isPower(tool)) {
-      powers.current = [...powers.current, spawnPower(tool, at, origin(), performance.now())].slice(-MAX_POWERS);
+      powers.current = [...powers.current, spawnPower(tool, at, origin(), performance.now())];
       setStatus(tool === "beam" ? "Spirit beam charging." : tool === "vortex" ? "Gravity well forming." : "Sky bolt charging.");
     }
   };
