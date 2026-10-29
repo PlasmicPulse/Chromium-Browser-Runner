@@ -25,9 +25,9 @@ const MAX_BALLS = 6, MAX_BLASTS = 3, MAX_RINGS = 6, BLAST_RANGE = 150, DROP_MS =
 const COLORS = ["#ef7058", "#f4d06f", "#c9f36a", "#7fc8c2", "#f3a6b8"];
 const origin = (): GadgetPoint => ({ x: window.innerWidth / 2, y: window.innerHeight - 46 });
 const POWER_TEXT: Record<PowerTool, [string, string]> = {
-  beam: ["The beam connects. {n} rockets across the screen.", "The beam goes wide. Line it up with {n}."],
-  vortex: ["The well collapses and slings {n} into orbit.", "{n} was outside the ring. Open it closer."],
-  lightning: ["The bolt lands and launches {n} skyward.", "The bolt lands. {n} was out of reach."],
+  beam: ["Direct hit. The spirit beam drives {n} back.", "The beam misses. Re-align on {n}."],
+  vortex: ["The well collapses and slings {n} outward.", "{n} was beyond the well's reach."],
+  lightning: ["Sky bolt lands. {n} is launched upward.", "The bolt misses; {n} was beyond the impact zone."],
 };
 
 export function PetGadgetLayer(props: Props) {
@@ -119,7 +119,7 @@ export function PetGadgetLayer(props: Props) {
     else if (tool === "airstrike") strike(at);
     else if (isPower(tool)) {
       powers.current = [...powers.current, spawnPower(tool, at, origin(), performance.now())].slice(-MAX_POWERS);
-      setStatus(tool === "beam" ? "Charging the beam." : tool === "vortex" ? "The well is pulling." : "Bolt incoming.");
+      setStatus(tool === "beam" ? "Spirit beam charging." : tool === "vortex" ? "Gravity well forming." : "Sky bolt charging.");
     }
   };
   const actRef = useRef(act); actRef.current = act;
@@ -176,21 +176,47 @@ export function PetGadgetLayer(props: Props) {
 
       if (currentTool !== "mallet") {
         ctx.save();
-        ctx.strokeStyle = "rgba(239,112,88,.85)"; ctx.lineWidth = 2; ctx.setLineDash([6, 6]);
-        if (currentTool === "foam" || currentTool === "beam") {
+        if (currentTool === "beam") {
+          const dx = a.x - o.x, dy = a.y - o.y, d = Math.hypot(dx, dy) || 1;
+          const nx = -dy / d, ny = dx / d;
+          ctx.globalAlpha = 0.42; ctx.strokeStyle = "#9bdde0"; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.lineTo(a.x, a.y); ctx.stroke();
+          ctx.globalAlpha = 0.36; ctx.strokeStyle = "#68c2ca"; ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(o.x + nx * 8, o.y + ny * 8); ctx.lineTo(a.x + nx * 8, a.y + ny * 8);
+          ctx.moveTo(o.x - nx * 8, o.y - ny * 8); ctx.lineTo(a.x - nx * 8, a.y - ny * 8);
+          ctx.stroke();
+          ctx.globalAlpha = 0.8; ctx.fillStyle = "#dffeff";
+          ctx.beginPath(); ctx.arc(o.x, o.y, 6, 0, Math.PI * 2); ctx.fill();
+        } else if (currentTool === "foam") {
+          ctx.strokeStyle = "rgba(239,112,88,.85)"; ctx.lineWidth = 2; ctx.setLineDash([6, 6]);
           ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.lineTo(a.x, a.y); ctx.stroke();
           ctx.setLineDash([]); ctx.fillStyle = "#1e4e48";
           ctx.beginPath(); ctx.roundRect(o.x - 20, o.y - 10, 40, 26, 9); ctx.fill();
-          ctx.fillStyle = currentTool === "beam" ? "#7fc8c2" : "#c9f36a"; ctx.beginPath(); ctx.arc(o.x, o.y, 6, 0, Math.PI * 2); ctx.fill();
-        } else if (currentTool === "airstrike" || currentTool === "vortex") {
+          ctx.fillStyle = "#c9f36a"; ctx.beginPath(); ctx.arc(o.x, o.y, 6, 0, Math.PI * 2); ctx.fill();
+        } else if (currentTool === "vortex") {
+          ctx.strokeStyle = "rgba(130,151,217,.3)"; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.arc(a.x, a.y, VORTEX_RANGE, 0, Math.PI * 2); ctx.stroke();
+          ctx.strokeStyle = "rgba(165,184,244,.8)"; ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.arc(a.x, a.y, VORTEX_RANGE - 5, 0, Math.PI * 2); ctx.stroke();
+        } else if (currentTool === "lightning") {
+          ctx.strokeStyle = "rgba(226,174,95,.36)"; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(a.x, 64); ctx.lineTo(a.x, a.y - 28); ctx.stroke();
+          ctx.strokeStyle = "rgba(241,197,118,.5)"; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.arc(a.x, a.y, 52, 0, Math.PI * 2); ctx.stroke();
+          ctx.beginPath(); ctx.arc(a.x, a.y, 46, 0, Math.PI * 2); ctx.stroke();
+        } else if (currentTool === "airstrike") {
           ctx.strokeStyle = "rgba(30,78,72,.55)";
-          ctx.beginPath(); ctx.arc(a.x, a.y, currentTool === "vortex" ? VORTEX_RANGE : BLAST_RANGE, 0, Math.PI * 2); ctx.stroke();
+          ctx.beginPath(); ctx.arc(a.x, a.y, BLAST_RANGE, 0, Math.PI * 2); ctx.stroke();
         }
-        ctx.setLineDash([]); ctx.strokeStyle = "#ef7058"; ctx.lineWidth = 2.5;
+        ctx.setLineDash([]);
+        ctx.strokeStyle = currentTool === "beam" ? "#dffeff" : currentTool === "vortex" ? "#bbc9ff" : currentTool === "lightning" ? "#ffe1a5" : "#ef7058";
+        ctx.lineWidth = currentTool === "beam" || currentTool === "vortex" || currentTool === "lightning" ? 1.8 : 2.5;
         ctx.beginPath(); ctx.arc(a.x, a.y, 11, 0, Math.PI * 2);
         ctx.moveTo(a.x - 17, a.y); ctx.lineTo(a.x - 6, a.y); ctx.moveTo(a.x + 6, a.y); ctx.lineTo(a.x + 17, a.y);
         ctx.moveTo(a.x, a.y - 17); ctx.lineTo(a.x, a.y - 6); ctx.moveTo(a.x, a.y + 6); ctx.lineTo(a.x, a.y + 17);
         ctx.stroke();
+        ctx.globalAlpha = 1;
         ctx.restore();
       }
 

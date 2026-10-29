@@ -24,18 +24,18 @@ export const GADGETS: Gadget[] = [
   },
   {
     id: "beam", group: "power", label: "Spirit beam", icon: Zap,
-    short: "Charge and fire a focused energy beam.",
-    help: "Click or tap to charge at the bottom emitter, then the beam fires along the dotted line. Anything on the line gets pushed hard. Arrow keys aim, Enter fires.",
+    short: "Build a focused charge, then unleash a forceful beam.",
+    help: "Click or tap to lock a trajectory from the bottom emitter. After a deliberate charge, the beam drives anything on its path back. Arrow keys aim, Enter fires.",
   },
   {
     id: "vortex", group: "power", label: "Gravity well", icon: Tornado,
-    short: "Open a swirling well that slings Pip.",
-    help: "Click or tap to open a gravity well. If Pip is inside the ring when it collapses, they get slung into orbit. Arrow keys aim, Enter opens.",
+    short: "Form a crushing gravity well and sling Pip outward.",
+    help: "Click or tap to form a gravity well. When its rings collapse, Pip inside the marked radius is slung outward. Arrow keys aim, Enter opens.",
   },
   {
     id: "lightning", group: "power", label: "Sky bolt", icon: CloudLightning,
-    short: "Call a bolt down onto a marked spot.",
-    help: "Click or tap to mark a spot. A bolt comes down a moment later and launches Pip if they are close. Arrow keys aim, Enter calls it.",
+    short: "Mark the ground for a heavy, precise sky strike.",
+    help: "Click or tap to mark a strike point. After a measured charge, a bolt lands and launches Pip if they are close. Arrow keys aim, Enter calls it.",
   },
 ];
 
